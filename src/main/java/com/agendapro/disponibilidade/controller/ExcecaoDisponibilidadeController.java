@@ -1,5 +1,7 @@
 package com.agendapro.disponibilidade.controller;
 
+import static com.agendapro.shared.web.ApiPaths.API_V1;
+
 import java.time.LocalDate;
 import java.util.List;
 
@@ -23,7 +25,7 @@ import com.agendapro.disponibilidade.service.ExcecaoDisponibilidadeService;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/excecoes-disponibilidade")
+@RequestMapping(API_V1 + "/excecoes-disponibilidade")
 public class ExcecaoDisponibilidadeController {
 
 	private final ExcecaoDisponibilidadeService excecaoService;

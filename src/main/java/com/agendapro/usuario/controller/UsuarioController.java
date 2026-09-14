@@ -1,5 +1,7 @@
 package com.agendapro.usuario.controller;
 
+import static com.agendapro.shared.web.ApiPaths.API_V1;
+
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -24,7 +26,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/usuarios")
+@RequestMapping(API_V1 + "/usuarios")
 public class UsuarioController {
 
 	private final UsuarioService usuarioService;

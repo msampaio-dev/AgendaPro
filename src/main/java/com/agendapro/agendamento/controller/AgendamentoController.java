@@ -1,5 +1,7 @@
 package com.agendapro.agendamento.controller;
 
+import static com.agendapro.shared.web.ApiPaths.API_V1;
+
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
@@ -28,7 +30,7 @@ import com.agendapro.shared.dto.PaginaResponse;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/agendamentos")
+@RequestMapping(API_V1 + "/agendamentos")
 public class AgendamentoController {
 
 	private final AgendamentoService agendamentoService;

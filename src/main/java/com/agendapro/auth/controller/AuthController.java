@@ -1,5 +1,7 @@
 package com.agendapro.auth.controller;
 
+import static com.agendapro.shared.web.ApiPaths.API_V1;
+
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,7 +18,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/auth")
+@RequestMapping(API_V1 + "/auth")
 public class AuthController {
 
 	private final AuthService authService;

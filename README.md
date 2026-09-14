@@ -18,6 +18,7 @@ segurança, consistência transacional e evolução gradual para um produto comp
 - JUnit 5, Mockito e Testcontainers
 - Swagger/OpenAPI
 - Docker e Docker Compose
+- GitHub Actions
 
 ## Funcionalidades
 
@@ -34,6 +35,9 @@ segurança, consistência transacional e evolução gradual para um produto comp
 - Filtros por período e status
 - Paginação e ordenação
 - Erros HTTP padronizados
+- API versionada em `/api/v1`
+- Bootstrap seguro e opcional do primeiro administrador
+- CORS configurável para o frontend
 - Documentação interativa com Swagger UI
 
 ## Regras de negócio importantes
@@ -96,6 +100,11 @@ Pré-requisitos:
 - PostgreSQL
 - Docker Desktop para os testes com Testcontainers
 
+Sem perfil explícito, a aplicação utiliza `dev`, com PostgreSQL em
+`localhost:5432`. O perfil `test` é ativado pelos testes e sempre usa
+Testcontainers. O perfil `prod` exige banco, JWT e origens CORS definidos por
+variáveis de ambiente, sem valores locais como fallback.
+
 Crie o banco `agendapro` e o usuário `agendapro_user`. Depois defina as variáveis
 de ambiente `DB_PASSWORD` e `JWT_SECRET`.
 
@@ -114,6 +123,27 @@ Execute a aplicação:
 .\mvnw.cmd spring-boot:run
 ```
 
+### Criando o primeiro administrador
+
+Não existe endpoint público para promover usuários a `ADMIN`. Para criar o
+primeiro administrador, defina temporariamente estas variáveis antes de iniciar a
+aplicação:
+
+```powershell
+$env:BOOTSTRAP_ADMIN_ENABLED="true"
+$env:BOOTSTRAP_ADMIN_NAME="Administrador"
+$env:BOOTSTRAP_ADMIN_EMAIL="admin@agendapro.com"
+$env:BOOTSTRAP_ADMIN_PASSWORD="troque-por-uma-senha-forte"
+.\mvnw.cmd spring-boot:run
+```
+
+O bootstrap só cria o usuário quando ainda não existe nenhum `ADMIN`. A senha é
+validada e armazenada com BCrypt. Se o e-mail já pertencer a outro usuário, a
+aplicação falha sem promover essa conta silenciosamente.
+
+Depois da primeira inicialização bem-sucedida, pare a aplicação, desative
+`BOOTSTRAP_ADMIN_ENABLED` e remova nome, e-mail e senha das variáveis de ambiente.
+
 ## Executando com Docker
 
 Crie seu arquivo local de variáveis a partir do exemplo:
@@ -131,6 +161,10 @@ Suba a API e o PostgreSQL:
 docker compose up --build
 ```
 
+O Compose ativa o perfil `prod`. Para uma implantação real, defina
+`SWAGGER_ENABLED=false`; no ambiente Docker local ele permanece habilitado para
+facilitar os testes manuais.
+
 Para encerrar:
 
 ```powershell
@@ -147,6 +181,8 @@ Com a aplicação iniciada:
 
 - Swagger UI: `http://localhost:8080/swagger-ui.html`
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+- URL base da API: `http://localhost:8080/api/v1`
+- Health check: `http://localhost:8080/actuator/health`
 
 Cadastre um usuário ou faça login, copie o token retornado e utilize o botão
 **Authorize** do Swagger com o JWT.
@@ -155,21 +191,21 @@ Cadastre um usuário ou faça login, copie o token retornado e utilize o botão
 
 | Método | Endpoint | Finalidade |
 |---|---|---|
-| `POST` | `/usuarios` | Cadastrar usuário |
-| `POST` | `/auth/login` | Autenticar e gerar JWT |
-| `GET` | `/usuarios/{id}` | Consultar usuário |
-| `POST` | `/profissionais` | Criar perfil profissional |
-| `POST` | `/servicos` | Cadastrar serviço |
-| `POST` | `/profissionais-servicos` | Associar profissional e serviço |
-| `POST` | `/horarios-atendimento` | Cadastrar horário semanal |
-| `POST` | `/excecoes-disponibilidade` | Criar bloqueio ou horário extra |
-| `GET` | `/disponibilidades` | Consultar horários disponíveis |
-| `POST` | `/agendamentos` | Criar agendamento |
-| `GET` | `/agendamentos` | Histórico paginado do profissional |
-| `GET` | `/agendamentos/cliente/{id}` | Histórico paginado do cliente |
-| `PATCH` | `/agendamentos/{id}/confirmar` | Confirmar agendamento |
-| `PATCH` | `/agendamentos/{id}/cancelar` | Cancelar agendamento |
-| `PATCH` | `/agendamentos/{id}/concluir` | Concluir atendimento |
+| `POST` | `/api/v1/usuarios` | Cadastrar usuário |
+| `POST` | `/api/v1/auth/login` | Autenticar e gerar JWT |
+| `GET` | `/api/v1/usuarios/{id}` | Consultar usuário |
+| `POST` | `/api/v1/profissionais` | Criar perfil profissional |
+| `POST` | `/api/v1/servicos` | Cadastrar serviço |
+| `POST` | `/api/v1/profissionais-servicos` | Associar profissional e serviço |
+| `POST` | `/api/v1/horarios-atendimento` | Cadastrar horário semanal |
+| `POST` | `/api/v1/excecoes-disponibilidade` | Criar bloqueio ou horário extra |
+| `GET` | `/api/v1/disponibilidades` | Consultar horários disponíveis |
+| `POST` | `/api/v1/agendamentos` | Criar agendamento |
+| `GET` | `/api/v1/agendamentos` | Histórico paginado do profissional |
+| `GET` | `/api/v1/agendamentos/cliente/{id}` | Histórico paginado do cliente |
+| `PATCH` | `/api/v1/agendamentos/{id}/confirmar` | Confirmar agendamento |
+| `PATCH` | `/api/v1/agendamentos/{id}/cancelar` | Cancelar agendamento |
+| `PATCH` | `/api/v1/agendamentos/{id}/concluir` | Concluir atendimento |
 
 A documentação OpenAPI contém todos os parâmetros e contratos disponíveis.
 
@@ -178,11 +214,25 @@ A documentação OpenAPI contém todos os parâmetros e contratos disponíveis.
 Exemplo da agenda de um profissional:
 
 ```text
-GET /agendamentos?profissionalId=1&dataInicio=2030-01-01&dataFim=2030-01-31&status=CONFIRMADO&page=0&size=20&sort=inicio,desc
+GET /api/v1/agendamentos?profissionalId=1&dataInicio=2030-01-01&dataFim=2030-01-31&status=CONFIRMADO&page=0&size=20&sort=inicio,desc
 ```
 
 O tamanho máximo é de 100 registros. A ordenação aceita `id`, `inicio`, `fim` e
 `status`.
+
+## Integração com o frontend
+
+Por padrão, o navegador permite chamadas originadas de
+`http://localhost:5173`, porta padrão do Vite. Para autorizar outras origens,
+configure uma lista separada por vírgulas:
+
+```text
+CORS_ALLOWED_ORIGINS=http://localhost:5173,https://app.exemplo.com
+```
+
+São aceitos apenas os métodos e cabeçalhos necessários à API. Como o JWT é enviado
+no cabeçalho `Authorization`, credenciais baseadas em cookies permanecem
+desabilitadas no CORS.
 
 ## Banco de dados e migrations
 
@@ -207,7 +257,7 @@ Execute toda a suíte:
 ```
 
 O projeto possui testes unitários, testes HTTP, validação do contexto, testes com
-PostgreSQL real e teste de concorrência. No fechamento desta versão, os 87 testes
+PostgreSQL real e teste de concorrência. No fechamento desta versão, os 94 testes
 passaram sem falhas.
 
 Todos os testes de integração utilizam Testcontainers e o perfil `test`. Cada
@@ -217,6 +267,13 @@ o banco.
 
 O teste de concorrência comprova também que somente uma de duas reservas
 simultâneas para o mesmo horário é aceita.
+
+## Integração contínua
+
+O workflow `.github/workflows/backend-ci.yml` executa `mvn verify` com Java 21 em
+todo push e pull request para `main`. O Docker disponível no runner é usado pelos
+testes de integração com Testcontainers; nenhuma credencial do banco de
+desenvolvimento é necessária.
 
 ## Segurança
 

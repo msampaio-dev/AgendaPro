@@ -2,6 +2,7 @@ package com.agendapro.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -30,6 +31,7 @@ public class SecurityConfig {
 	) throws Exception {
 		return http
 				.csrf(AbstractHttpConfigurer::disable)
+				.cors(Customizer.withDefaults())
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.formLogin(AbstractHttpConfigurer::disable)
 				.httpBasic(AbstractHttpConfigurer::disable)
@@ -49,11 +51,12 @@ public class SecurityConfig {
 										"Acesso negado"
 								)))
 				.authorizeHttpRequests(auth -> auth
-						.requestMatchers(HttpMethod.POST, "/usuarios", "/auth/login").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/v1/usuarios", "/api/v1/auth/login").permitAll()
 						.requestMatchers(
 								"/v3/api-docs/**",
 								"/swagger-ui/**",
-								"/swagger-ui.html"
+								"/swagger-ui.html",
+								"/actuator/health"
 						).permitAll()
 						.anyRequest().authenticated())
 				.oauth2ResourceServer(oauth2 -> oauth2

@@ -1,0 +1,33 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Java 21 e Testcontainers
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v7
+
+      - name: Configurar Java 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Permitir execução do Maven Wrapper
+        run: chmod +x mvnw
+
+      - name: Compilar e executar testes
+        run: ./mvnw --batch-mode --no-transfer-progress verify

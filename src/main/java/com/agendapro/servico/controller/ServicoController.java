@@ -1,5 +1,7 @@
 package com.agendapro.servico.controller;
 
+import static com.agendapro.shared.web.ApiPaths.API_V1;
+
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -23,7 +25,7 @@ import com.agendapro.servico.service.ServicoService;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/servicos")
+@RequestMapping(API_V1 + "/servicos")
 public class ServicoController {
 
 	private final ServicoService servicoService;
