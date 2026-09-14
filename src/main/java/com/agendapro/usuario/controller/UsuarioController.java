@@ -1,0 +1,74 @@
+package com.agendapro.usuario.controller;
+
+import java.util.List;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.agendapro.usuario.dto.AtualizacaoUsuarioRequest;
+import com.agendapro.usuario.dto.CadastroUsuarioRequest;
+import com.agendapro.usuario.dto.UsuarioResponse;
+import com.agendapro.usuario.entity.Usuario;
+import com.agendapro.usuario.service.UsuarioService;
+
+import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
+
+@RestController
+@RequestMapping("/usuarios")
+public class UsuarioController {
+
+	private final UsuarioService usuarioService;
+
+	public UsuarioController(UsuarioService usuarioService) {
+		this.usuarioService = usuarioService;
+	}
+
+	@PostMapping
+	@ResponseStatus(HttpStatus.CREATED)
+	@Operation(summary = "Cadastrar usuário", security = {})
+	public UsuarioResponse cadastrar(@Valid @RequestBody CadastroUsuarioRequest request) {
+		Usuario usuario = usuarioService.cadastrar(request.nome(), request.email(), request.senha());
+
+		return UsuarioResponse.from(usuario);
+	}
+
+	@GetMapping("/{id}")
+	@PreAuthorize("@usuarioAuthorization.proprioUsuarioOuAdmin(#id, authentication)")
+	public UsuarioResponse buscarPorId(@PathVariable Long id) {
+		Usuario usuario = usuarioService.buscarPorId(id);
+
+		return UsuarioResponse.from(usuario);
+	}
+
+	@GetMapping
+	@PreAuthorize("hasRole('ADMIN')")
+	public List<UsuarioResponse> listar() {
+		return usuarioService.listar().stream().map(UsuarioResponse::from).toList();
+	}
+
+	@PutMapping("/{id}")
+	@PreAuthorize("@usuarioAuthorization.proprioUsuarioOuAdmin(#id, authentication)")
+	public UsuarioResponse atualizar(@PathVariable Long id, @Valid @RequestBody AtualizacaoUsuarioRequest request) {
+		Usuario usuario = usuarioService.atualizar(id, request.nome(), request.email());
+
+		return UsuarioResponse.from(usuario);
+	}
+
+	@DeleteMapping("/{id}")
+	@PreAuthorize("@usuarioAuthorization.proprioUsuarioOuAdmin(#id, authentication)")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void desativar(@PathVariable Long id) {
+		usuarioService.desativar(id);
+	}
+
+}

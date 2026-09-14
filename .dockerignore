@@ -1,0 +1,10 @@
+target
+bin
+.git
+.settings
+.classpath
+.project
+.idea
+.vscode
+.env
+*.log
