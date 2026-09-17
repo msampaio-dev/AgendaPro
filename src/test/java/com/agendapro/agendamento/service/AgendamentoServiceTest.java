@@ -45,6 +45,7 @@ import com.agendapro.agendamento.exception.HorarioLocalInvalidoException;
 import com.agendapro.agendamento.repository.AgendamentoRepository;
 import com.agendapro.disponibilidade.dto.DisponibilidadeResponse;
 import com.agendapro.disponibilidade.dto.HorarioDisponivelResponse;
+import com.agendapro.disponibilidade.dto.SituacaoDisponibilidade;
 import com.agendapro.disponibilidade.service.DisponibilidadeService;
 import com.agendapro.profissional.entity.Profissional;
 import com.agendapro.profissional.service.ProfissionalService;
@@ -59,6 +60,7 @@ class AgendamentoServiceTest {
 	private static final Long CLIENTE_ID = 1L;
 	private static final Long PROFISSIONAL_ID = 2L;
 	private static final Long SERVICO_ID = 3L;
+	private static final Long SERVICO_ADICIONAL_ID = 4L;
 	private static final LocalDate DATA = LocalDate.of(2030, 1, 7);
 	private static final LocalTime HORARIO = LocalTime.of(9, 0);
 
@@ -127,6 +129,48 @@ class AgendamentoServiceTest {
 	}
 
 	@Test
+	void deveCriarAgendamentoComServicoAdicionalEDuracaoSomada() {
+		Servico adicional = new Servico(
+				"Barba", null, 30, new BigDecimal("30.00"));
+		when(usuarioService.buscarPorId(CLIENTE_ID)).thenReturn(cliente);
+		when(disponibilidadeService.consultar(
+				PROFISSIONAL_ID, SERVICO_ID, SERVICO_ADICIONAL_ID, DATA))
+				.thenReturn(new DisponibilidadeResponse(
+						PROFISSIONAL_ID,
+						SERVICO_ID,
+						DATA,
+						SituacaoDisponibilidade.DISPONIVEL,
+						List.of(new HorarioDisponivelResponse(
+								HORARIO, LocalTime.of(10, 0)))
+				));
+		when(profissionalService.buscarPorId(PROFISSIONAL_ID))
+				.thenReturn(profissional);
+		when(servicoService.buscarPorId(SERVICO_ID)).thenReturn(servico);
+		when(servicoService.buscarPorId(SERVICO_ADICIONAL_ID)).thenReturn(adicional);
+		when(agendamentoRepository
+				.existsByProfissionalIdAndStatusInAndInicioLessThanAndFimGreaterThan(
+						PROFISSIONAL_ID,
+						StatusAgendamento.QUE_OCUPAM_HORARIO,
+						Instant.parse("2030-01-07T13:00:00Z"),
+						Instant.parse("2030-01-07T12:00:00Z")))
+				.thenReturn(false);
+		when(agendamentoRepository.saveAndFlush(any(Agendamento.class)))
+				.thenAnswer(invocacao -> invocacao.getArgument(0));
+
+		Agendamento resultado = agendamentoService.agendar(
+				CLIENTE_ID,
+				PROFISSIONAL_ID,
+				SERVICO_ID,
+				SERVICO_ADICIONAL_ID,
+				DATA,
+				HORARIO
+		);
+
+		assertSame(adicional, resultado.getServicoAdicional());
+		assertEquals(Instant.parse("2030-01-07T13:00:00Z"), resultado.getFim());
+	}
+
+	@Test
 	void naoDeveAgendarHorarioForaDaDisponibilidade() {
 		when(usuarioService.buscarPorId(CLIENTE_ID)).thenReturn(cliente);
 		when(disponibilidadeService.consultar(
@@ -137,6 +181,7 @@ class AgendamentoServiceTest {
 				PROFISSIONAL_ID,
 				SERVICO_ID,
 				DATA,
+				SituacaoDisponibilidade.HORARIOS_OCUPADOS,
 				List.of()
 		));
 
@@ -210,6 +255,7 @@ class AgendamentoServiceTest {
 				PROFISSIONAL_ID,
 				SERVICO_ID,
 				dataMudancaFuso,
+				SituacaoDisponibilidade.DISPONIVEL,
 				List.of(new HorarioDisponivelResponse(
 						horarioInexistente,
 						LocalTime.of(3, 0)
@@ -387,6 +433,53 @@ class AgendamentoServiceTest {
 	}
 
 	@Test
+	void deveListarAgendaAdministrativaComFiltrosEPaginacao() {
+		Agendamento agendamento = novoAgendamento();
+		PageRequest requisicao = PageRequest.of(
+				0,
+				25,
+				Sort.by(Sort.Direction.DESC, "inicio")
+		);
+		when(profissionalService.buscarPorId(PROFISSIONAL_ID)).thenReturn(profissional);
+		when(agendamentoRepository.findAll(
+				org.mockito.ArgumentMatchers.<Specification<Agendamento>>any(),
+				eq(requisicao)
+		)).thenReturn(new PageImpl<>(List.of(agendamento), requisicao, 1));
+
+		Page<Agendamento> resultado = agendamentoService.listarParaAdministracao(
+				PROFISSIONAL_ID,
+				OffsetDateTime.parse("2030-01-01T00:00:00-03:00"),
+				OffsetDateTime.parse("2030-02-01T00:00:00-03:00"),
+				StatusAgendamento.CONFIRMADO,
+				requisicao
+		);
+
+		assertEquals(1, resultado.getTotalElements());
+		assertSame(agendamento, resultado.getContent().get(0));
+		verify(profissionalService).buscarPorId(PROFISSIONAL_ID);
+	}
+
+	@Test
+	void naoDeveListarAgendaAdministrativaComIntervaloInvertido() {
+		assertThrows(
+				FiltroAgendamentoInvalidoException.class,
+				() -> agendamentoService.listarParaAdministracao(
+						null,
+						OffsetDateTime.parse("2030-02-01T00:00:00-03:00"),
+						OffsetDateTime.parse("2030-01-01T00:00:00-03:00"),
+						null,
+						PageRequest.of(0, 20)
+				)
+		);
+
+		verifyNoInteractions(profissionalService);
+		verify(agendamentoRepository, never()).findAll(
+				org.mockito.ArgumentMatchers.<Specification<Agendamento>>any(),
+				any(Pageable.class)
+		);
+	}
+
+	@Test
 	void deveListarAgendamentosPeloDiaLocalDoProfissional() {
 		Agendamento agendamento = novoAgendamento();
 		when(profissionalService.buscarPorId(PROFISSIONAL_ID))
@@ -415,6 +508,7 @@ class AgendamentoServiceTest {
 				PROFISSIONAL_ID,
 				SERVICO_ID,
 				DATA,
+				SituacaoDisponibilidade.DISPONIVEL,
 				List.of(new HorarioDisponivelResponse(
 						HORARIO,
 						LocalTime.of(9, 30)

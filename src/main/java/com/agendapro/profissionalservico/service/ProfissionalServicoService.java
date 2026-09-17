@@ -90,6 +90,14 @@ public class ProfissionalServicoService {
 	}
 
 	@Transactional(readOnly = true)
+	public List<ProfissionalServico> listarAtivosPorServico(Long servicoId) {
+		servicoService.buscarPorId(servicoId);
+
+		return profissionalServicoRepository
+				.findAllByServicoIdAndAtivoTrue(servicoId);
+	}
+
+	@Transactional(readOnly = true)
 	public void validarAssociacaoAtiva(Long profissionalId, Long servicoId) {
 		boolean associacaoAtiva = profissionalServicoRepository
 				.existsByProfissionalIdAndServicoIdAndAtivoTrue(

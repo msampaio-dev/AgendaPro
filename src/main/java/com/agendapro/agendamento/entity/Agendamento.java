@@ -3,6 +3,7 @@ package com.agendapro.agendamento.entity;
 import java.time.Instant;
 
 import com.agendapro.agendamento.exception.TransicaoStatusAgendamentoInvalidaException;
+import com.agendapro.barbearia.entity.Barbearia;
 import com.agendapro.profissional.entity.Profissional;
 import com.agendapro.servico.entity.Servico;
 import com.agendapro.usuario.entity.Usuario;
@@ -36,8 +37,16 @@ public class Agendamento {
 	private Profissional profissional;
 
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
+	@JoinColumn(name = "barbearia_id", nullable = false)
+	private Barbearia barbearia;
+
+	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "servico_id", nullable = false)
 	private Servico servico;
+
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "servico_adicional_id")
+	private Servico servicoAdicional;
 
 	@Column(nullable = false)
 	private Instant inicio;
@@ -61,9 +70,22 @@ public class Agendamento {
 	) {
 		this.cliente = cliente;
 		this.profissional = profissional;
+		this.barbearia = profissional.getBarbearia();
 		this.servico = servico;
 		this.inicio = inicio;
 		this.fim = fim;
+	}
+
+	public Agendamento(
+			Usuario cliente,
+			Profissional profissional,
+			Servico servico,
+			Servico servicoAdicional,
+			Instant inicio,
+			Instant fim
+	) {
+		this(cliente, profissional, servico, inicio, fim);
+		this.servicoAdicional = servicoAdicional;
 	}
 
 	public Long getId() {
@@ -78,9 +100,15 @@ public class Agendamento {
 		return profissional;
 	}
 
+	public Barbearia getBarbearia() {
+		return barbearia;
+	}
+
 	public Servico getServico() {
 		return servico;
 	}
+
+	public Servico getServicoAdicional() { return servicoAdicional; }
 
 	public Instant getInicio() {
 		return inicio;

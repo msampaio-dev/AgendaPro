@@ -187,6 +187,26 @@ class ProfissionalServicoServiceTest {
 	}
 
 	@Test
+	void deveListarAssociacoesAtivasDoServico() {
+		Long servicoId = 2L;
+		Servico servico = novoServico();
+		ProfissionalServico associacao =
+				new ProfissionalServico(novoProfissional(), servico);
+
+		when(servicoService.buscarPorId(servicoId)).thenReturn(servico);
+		when(profissionalServicoRepository.findAllByServicoIdAndAtivoTrue(servicoId))
+				.thenReturn(List.of(associacao));
+
+		List<ProfissionalServico> resultado = profissionalServicoService
+				.listarAtivosPorServico(servicoId);
+
+		assertSame(associacao, resultado.get(0));
+		verify(servicoService).buscarPorId(servicoId);
+		verify(profissionalServicoRepository)
+				.findAllByServicoIdAndAtivoTrue(servicoId);
+	}
+
+	@Test
 	void deveDesativarAssociacaoQuandoExistir() {
 		Long id = 1L;
 		ProfissionalServico profissionalServico =

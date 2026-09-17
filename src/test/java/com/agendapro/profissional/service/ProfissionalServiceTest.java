@@ -27,9 +27,14 @@ import com.agendapro.usuario.entity.Usuario;
 import com.agendapro.usuario.entity.PerfilUsuario;
 import com.agendapro.usuario.exception.UsuarioInativoException;
 import com.agendapro.usuario.service.UsuarioService;
+import com.agendapro.barbearia.entity.Barbearia;
+import com.agendapro.barbearia.service.BarbeariaService;
+import com.agendapro.barbearia.repository.BarbeariaRepository;
+import com.agendapro.barbearia.exception.OperacaoBarbeariaConflitanteException;
 
 @ExtendWith(MockitoExtension.class)
 class ProfissionalServiceTest {
+	private static final Long BARBEARIA_ID = 10L;
 
 	@Mock
 	private ProfissionalRepository profissionalRepository;
@@ -37,8 +42,25 @@ class ProfissionalServiceTest {
 	@Mock
 	private UsuarioService usuarioService;
 
+	@Mock
+	private BarbeariaService barbeariaService;
+
+	@Mock
+	private BarbeariaRepository barbeariaRepository;
+
 	@InjectMocks
 	private ProfissionalService profissionalService;
+
+	@Test
+	void naoDeveDesativarProprietarioDeBarbeariaAtiva() {
+		Profissional profissional = org.mockito.Mockito.mock(Profissional.class);
+		when(profissionalRepository.findById(8L)).thenReturn(Optional.of(profissional));
+		when(barbeariaRepository.existsByProprietarioIdAndAtivoTrue(8L)).thenReturn(true);
+
+		assertThrows(OperacaoBarbeariaConflitanteException.class,
+				() -> profissionalService.desativar(8L));
+		verify(profissional, never()).desativar();
+	}
 
 	@Test
 	void deveCadastrarProfissionalParaUsuarioAtivo() {
@@ -50,11 +72,13 @@ class ProfissionalServiceTest {
 
 		when(profissionalRepository.existsByUsuarioId(usuarioId))
 				.thenReturn(false);
+		when(barbeariaService.buscarAtivaPorId(BARBEARIA_ID))
+				.thenReturn(new Barbearia("Barbearia teste"));
 
 		when(profissionalRepository.save(any(Profissional.class)))
 				.thenAnswer(invocacao -> invocacao.getArgument(0));
 
-		Profissional resultado = profissionalService.cadastrar(usuarioId);
+		Profissional resultado = profissionalService.cadastrar(usuarioId, BARBEARIA_ID);
 
 		assertSame(usuario, resultado.getUsuario());
 		assertTrue(resultado.isAtivo());
@@ -76,7 +100,7 @@ class ProfissionalServiceTest {
 
 		assertThrows(
 				UsuarioInativoException.class,
-				() -> profissionalService.cadastrar(usuarioId)
+				() -> profissionalService.cadastrar(usuarioId, BARBEARIA_ID)
 		);
 
 		verify(profissionalRepository, never()).existsByUsuarioId(usuarioId);
@@ -96,7 +120,7 @@ class ProfissionalServiceTest {
 
 		assertThrows(
 				ProfissionalJaCadastradoException.class,
-				() -> profissionalService.cadastrar(usuarioId)
+				() -> profissionalService.cadastrar(usuarioId, BARBEARIA_ID)
 		);
 
 		verify(usuarioService).buscarPorId(usuarioId);

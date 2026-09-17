@@ -2,6 +2,8 @@ package com.agendapro.auth.service;
 
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -14,7 +16,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import com.agendapro.profissional.entity.Profissional;
+import com.agendapro.profissional.repository.ProfissionalRepository;
 import com.agendapro.auth.exception.CredenciaisInvalidasException;
 import com.agendapro.usuario.entity.Usuario;
 import com.agendapro.usuario.repository.UsuarioRepository;
@@ -24,6 +29,9 @@ class AuthServiceTest {
 
 	@Mock
 	private UsuarioRepository usuarioRepository;
+
+	@Mock
+	private ProfissionalRepository profissionalRepository;
 
 	@Mock
 	private PasswordEncoder passwordEncoder;
@@ -79,5 +87,34 @@ class AuthServiceTest {
 
 		verify(passwordEncoder, never()).matches(org.mockito.ArgumentMatchers.any(),
 				org.mockito.ArgumentMatchers.any());
+	}
+
+	@Test
+	void deveBuscarSessaoDeClienteSemProfissional() {
+		Usuario usuario = new Usuario("Marcelo", "marcelo@agendapro.com", "hash-bcrypt");
+		ReflectionTestUtils.setField(usuario, "id", 1L);
+		when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuario));
+		when(profissionalRepository.findByUsuarioId(1L)).thenReturn(Optional.empty());
+
+		var sessao = authService.buscarSessao(1L);
+
+		assertEquals(1L, sessao.id());
+		assertEquals("Marcelo", sessao.nome());
+		assertNull(sessao.profissionalId());
+	}
+
+	@Test
+	void deveBuscarSessaoComIdDoProfissional() {
+		Usuario usuario = new Usuario("Marcelo", "marcelo@agendapro.com", "hash-bcrypt");
+		ReflectionTestUtils.setField(usuario, "id", 1L);
+		Profissional profissional = new Profissional(usuario);
+		ReflectionTestUtils.setField(profissional, "id", 7L);
+		when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuario));
+		when(profissionalRepository.findByUsuarioId(1L)).thenReturn(Optional.of(profissional));
+
+		var sessao = authService.buscarSessao(1L);
+
+		assertEquals(7L, sessao.profissionalId());
+		assertEquals("America/Sao_Paulo", sessao.fusoHorario());
 	}
 }

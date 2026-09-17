@@ -11,4 +11,8 @@ public class HorarioAtendimentoInvalidoException extends RuntimeException {
 	public HorarioAtendimentoInvalidoException() {
 		super("O horário de início deve ser anterior ao horário de fim");
 	}
+
+	public HorarioAtendimentoInvalidoException(String mensagem) {
+		super(mensagem);
+	}
 }

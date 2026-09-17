@@ -26,6 +26,8 @@ segurança, consistência transacional e evolução gradual para um produto comp
 - Autenticação com senha BCrypt e emissão de JWT
 - Perfis `CLIENTE`, `PROFISSIONAL` e `ADMIN`
 - Cadastro de profissionais e serviços
+- Barbearias com proprietário, endereço, foto e horários de funcionamento
+- Administração da equipe e dos serviços pelo proprietário da unidade
 - Associação entre profissionais e serviços
 - Horários semanais de atendimento
 - Bloqueios e disponibilidades extras
@@ -59,6 +61,10 @@ Outras regras:
 - Um atendimento só pode ser concluído depois do horário final.
 - Horários são convertidos para `Instant` e armazenados como instante absoluto.
 - Cada profissional possui seu próprio `ZoneId`.
+- A agenda do profissional é limitada pelo funcionamento da barbearia, inclusive intervalos de almoço.
+- Cada barbearia ativa possui um proprietário profissional e cada profissional pode possuir uma unidade ativa.
+- A propriedade deve ser transferida para outro membro ativo antes de desativar ou transferir o proprietário.
+- Agendamentos guardam a barbearia original para preservar corretamente o histórico após transferências.
 - Horários inexistentes ou ambíguos por mudança de fuso são rejeitados.
 
 ## Arquitetura
@@ -70,6 +76,7 @@ com.agendapro
 ├── auth
 ├── usuario
 ├── profissional
+├── barbearia
 ├── profissionalservico
 ├── servico
 ├── disponibilidade
@@ -193,10 +200,19 @@ Cadastre um usuário ou faça login, copie o token retornado e utilize o botão
 |---|---|---|
 | `POST` | `/api/v1/usuarios` | Cadastrar usuário |
 | `POST` | `/api/v1/auth/login` | Autenticar e gerar JWT |
+| `GET` | `/api/v1/auth/me` | Consultar a sessão autenticada |
 | `GET` | `/api/v1/usuarios/{id}` | Consultar usuário |
 | `POST` | `/api/v1/profissionais` | Criar perfil profissional |
+| `PATCH` | `/api/v1/profissionais/{id}/barbearia` | Transferir profissional entre unidades |
+| `GET` | `/api/v1/barbearias` | Listar unidades ativas disponíveis ao cliente |
+| `POST` | `/api/v1/barbearias` | Profissional criar sua própria unidade |
+| `GET` | `/api/v1/barbearias/minhas` | Listar unidades administradas pelo profissional |
+| `PATCH` | `/api/v1/barbearias/{id}/proprietario` | Transferir propriedade a um membro da unidade |
+| `POST` | `/api/v1/barbearias/{id}/horarios` | Adicionar período de funcionamento |
+| `POST` | `/api/v1/barbearias/{id}/foto` | Enviar foto da unidade |
 | `POST` | `/api/v1/servicos` | Cadastrar serviço |
 | `POST` | `/api/v1/profissionais-servicos` | Associar profissional e serviço |
+| `GET` | `/api/v1/profissionais-servicos/por-servico` | Listar profissionais associados ao serviço |
 | `POST` | `/api/v1/horarios-atendimento` | Cadastrar horário semanal |
 | `POST` | `/api/v1/excecoes-disponibilidade` | Criar bloqueio ou horário extra |
 | `GET` | `/api/v1/disponibilidades` | Consultar horários disponíveis |

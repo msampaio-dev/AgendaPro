@@ -19,6 +19,9 @@ public record CadastroAgendamentoRequest(
 		@Positive
 		Long servicoId,
 
+		@Positive
+		Long servicoAdicionalId,
+
 		@NotNull
 		LocalDate data,
 

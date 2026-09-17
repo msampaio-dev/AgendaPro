@@ -49,6 +49,7 @@ public class AgendamentoController {
 				request.clienteId(),
 				request.profissionalId(),
 				request.servicoId(),
+				request.servicoAdicionalId(),
 				request.data(),
 				request.horarioInicio()
 		);
@@ -97,6 +98,27 @@ public class AgendamentoController {
 		return PaginaResponse.from(
 				agendamentoService.listarPorCliente(
 						clienteId,
+						inicioDe,
+						inicioAntesDe,
+						status,
+						pageable
+				),
+				AgendamentoResponse::from
+		);
+	}
+
+	@GetMapping("/admin")
+	@PreAuthorize("hasRole('ADMIN')")
+	public PaginaResponse<AgendamentoResponse> listarParaAdministracao(
+			@RequestParam(required = false) Long profissionalId,
+			@RequestParam(required = false) OffsetDateTime inicioDe,
+			@RequestParam(required = false) OffsetDateTime inicioAntesDe,
+			@RequestParam(required = false) StatusAgendamento status,
+			@ParameterObject @PageableDefault(size = 20) Pageable pageable
+	) {
+		return PaginaResponse.from(
+				agendamentoService.listarParaAdministracao(
+						profissionalId,
 						inicioDe,
 						inicioAntesDe,
 						status,

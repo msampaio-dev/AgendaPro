@@ -91,6 +91,49 @@ class HorarioAtendimentoServiceTest {
 	}
 
 	@Test
+	void deveCadastrarJornadaComIntervaloEmDoisPeriodos() {
+		Long profissionalId = 1L;
+		Profissional profissional = novoProfissional();
+
+		when(profissionalService.buscarPorId(profissionalId))
+				.thenReturn(profissional);
+
+		List<HorarioAtendimento> resultado =
+				horarioAtendimentoService.cadastrarJornadaComIntervalo(
+						profissionalId,
+						DayOfWeek.MONDAY,
+						LocalTime.of(9, 0),
+						LocalTime.of(12, 0),
+						LocalTime.of(13, 0),
+						LocalTime.of(18, 0)
+				);
+
+		assertEquals(2, resultado.size());
+		assertEquals(LocalTime.of(9, 0), resultado.get(0).getHorarioInicio());
+		assertEquals(LocalTime.of(12, 0), resultado.get(0).getHorarioFim());
+		assertEquals(LocalTime.of(13, 0), resultado.get(1).getHorarioInicio());
+		assertEquals(LocalTime.of(18, 0), resultado.get(1).getHorarioFim());
+		verify(horarioAtendimentoRepository).saveAll(resultado);
+	}
+
+	@Test
+	void naoDeveCadastrarJornadaComIntervaloForaDoExpediente() {
+		assertThrows(
+				HorarioAtendimentoInvalidoException.class,
+				() -> horarioAtendimentoService.cadastrarJornadaComIntervalo(
+						1L,
+						DayOfWeek.MONDAY,
+						LocalTime.of(9, 0),
+						LocalTime.of(8, 0),
+						LocalTime.of(9, 0),
+						LocalTime.of(18, 0)
+				)
+		);
+
+		verifyNoInteractions(profissionalService, horarioAtendimentoRepository);
+	}
+
+	@Test
 	void naoDeveCadastrarParaProfissionalInativo() {
 		Profissional profissional = novoProfissional();
 		profissional.desativar();

@@ -12,6 +12,7 @@ public interface ProfissionalServicoRepository
 		extends JpaRepository<ProfissionalServico, Long> {
 
 	boolean existsByIdAndProfissionalUsuarioIdAndProfissionalAtivoTrue(Long id, Long usuarioId);
+	boolean existsByIdAndProfissionalBarbeariaProprietarioUsuarioIdAndProfissionalAtivoTrue(Long id, Long usuarioId);
 
 	@Override
 	@EntityGraph(attributePaths = {"profissional", "servico"})
@@ -32,4 +33,7 @@ public interface ProfissionalServicoRepository
 	List<ProfissionalServico> findAllByProfissionalIdAndAtivoTrue(
 			Long profissionalId
 	);
+
+	@EntityGraph(attributePaths = {"profissional", "servico"})
+	List<ProfissionalServico> findAllByServicoIdAndAtivoTrue(Long servicoId);
 }

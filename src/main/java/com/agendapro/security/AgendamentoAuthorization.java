@@ -30,22 +30,30 @@ public class AgendamentoAuthorization {
 		return usuarioId != null && (
 				agendamentoRepository.existsByIdAndClienteId(agendamentoId, usuarioId)
 				|| agendamentoRepository
-						.existsByIdAndProfissionalUsuarioIdAndProfissionalAtivoTrue(agendamentoId, usuarioId));
+						.existsByIdAndProfissionalUsuarioIdAndProfissionalAtivoTrue(agendamentoId, usuarioId)
+				|| agendamentoRepository
+						.existsByIdAndBarbeariaProprietarioUsuarioIdAndBarbeariaAtivoTrue(
+								agendamentoId, usuarioId));
 	}
 
 	public boolean podeGerenciar(Long agendamentoId, Authentication authentication) {
 		if (administrador(authentication)) return true;
 		Long usuarioId = usuarioId(authentication);
 		return profissional(authentication) && usuarioId != null
-				&& agendamentoRepository
-						.existsByIdAndProfissionalUsuarioIdAndProfissionalAtivoTrue(agendamentoId, usuarioId);
+				&& (agendamentoRepository
+						.existsByIdAndProfissionalUsuarioIdAndProfissionalAtivoTrue(agendamentoId, usuarioId)
+						|| agendamentoRepository
+								.existsByIdAndBarbeariaProprietarioUsuarioIdAndBarbeariaAtivoTrue(
+										agendamentoId, usuarioId));
 	}
 
 	public boolean podeListar(Long profissionalId, Authentication authentication) {
 		if (administrador(authentication)) return true;
 		Long usuarioId = usuarioId(authentication);
 		return profissional(authentication) && usuarioId != null
-				&& profissionalRepository.existsByIdAndUsuarioIdAndAtivoTrue(profissionalId, usuarioId);
+				&& (profissionalRepository.existsByIdAndUsuarioIdAndAtivoTrue(profissionalId, usuarioId)
+						|| profissionalRepository
+								.existsByIdAndBarbeariaProprietarioUsuarioIdAndAtivoTrue(profissionalId, usuarioId));
 	}
 
 	public boolean podeListarCliente(Long clienteId, Authentication authentication) {

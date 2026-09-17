@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.agendapro.disponibilidade.dto.CadastroHorarioAtendimentoRequest;
+import com.agendapro.disponibilidade.dto.CadastroJornadaAtendimentoRequest;
 import com.agendapro.disponibilidade.dto.HorarioAtendimentoResponse;
 import com.agendapro.disponibilidade.entity.HorarioAtendimento;
 import com.agendapro.disponibilidade.service.HorarioAtendimentoService;
@@ -49,6 +50,22 @@ public class HorarioAtendimentoController {
 		);
 
 		return HorarioAtendimentoResponse.from(horario);
+	}
+
+	@PostMapping("/jornada")
+	@PreAuthorize("@profissionalAuthorization.podeGerenciar(#request.profissionalId(), authentication)")
+	@ResponseStatus(HttpStatus.CREATED)
+	public List<HorarioAtendimentoResponse> cadastrarJornadaComIntervalo(
+			@Valid @RequestBody CadastroJornadaAtendimentoRequest request
+	) {
+		return horarioAtendimentoService.cadastrarJornadaComIntervalo(
+				request.profissionalId(),
+				request.diaSemana(),
+				request.horarioInicio(),
+				request.inicioIntervalo(),
+				request.fimIntervalo(),
+				request.horarioFim()
+		).stream().map(HorarioAtendimentoResponse::from).toList();
 	}
 
 	@GetMapping

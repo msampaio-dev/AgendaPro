@@ -14,6 +14,7 @@ public interface HorarioAtendimentoRepository
 		extends JpaRepository<HorarioAtendimento, Long> {
 
 	boolean existsByIdAndProfissionalUsuarioIdAndProfissionalAtivoTrue(Long id, Long usuarioId);
+	boolean existsByIdAndProfissionalBarbeariaProprietarioUsuarioIdAndProfissionalAtivoTrue(Long id, Long usuarioId);
 
 	@Override
 	@EntityGraph(attributePaths = "profissional")
@@ -33,6 +34,11 @@ public interface HorarioAtendimentoRepository
 
 	List<HorarioAtendimento> findAllByProfissionalIdAndDiaSemanaAndAtivoTrueOrderByHorarioInicio(
 			Long profissionalId,
+			DayOfWeek diaSemana
+	);
+
+	List<HorarioAtendimento> findAllByProfissionalBarbeariaIdAndDiaSemanaAndAtivoTrue(
+			Long barbeariaId,
 			DayOfWeek diaSemana
 	);
 }

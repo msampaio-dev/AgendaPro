@@ -1,6 +1,7 @@
 package com.agendapro.agendamento;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -13,6 +14,10 @@ import java.util.concurrent.Future;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
@@ -40,13 +45,14 @@ class AgendamentoConcorrenciaIntegrationTest extends PostgresIntegrationTest {
 	private Long clienteId;
 	private Long profissionalId;
 	private Long servicoId;
+	private Long barbeariaId;
 
 	@BeforeEach
 	void prepararDados() {
 		jdbcTemplate.execute(
 				"TRUNCATE TABLE agendamentos, profissionais_servicos, "
 				+ "excecoes_disponibilidade, horarios_atendimento, "
-				+ "profissionais, servicos, usuarios RESTART IDENTITY CASCADE"
+				+ "profissionais, servicos, usuarios, barbearias RESTART IDENTITY CASCADE"
 		);
 
 		clienteId = inserirUsuario("Cliente", "cliente@teste.com");
@@ -54,11 +60,16 @@ class AgendamentoConcorrenciaIntegrationTest extends PostgresIntegrationTest {
 				"Profissional",
 				"profissional@teste.com"
 		);
+		barbeariaId = jdbcTemplate.queryForObject(
+				"INSERT INTO barbearias (nome, ativo) VALUES ('Teste', TRUE) RETURNING id",
+				Long.class
+		);
 		profissionalId = jdbcTemplate.queryForObject(
-				"INSERT INTO profissionais (usuario_id, ativo, fuso_horario) "
-				+ "VALUES (?, TRUE, 'America/Sao_Paulo') RETURNING id",
+				"INSERT INTO profissionais (usuario_id, barbearia_id, ativo, fuso_horario) "
+				+ "VALUES (?, ?, TRUE, 'America/Sao_Paulo') RETURNING id",
 				Long.class,
-				usuarioProfissionalId
+				usuarioProfissionalId,
+				barbeariaId
 		);
 		servicoId = jdbcTemplate.queryForObject(
 				"INSERT INTO servicos "
@@ -145,6 +156,65 @@ class AgendamentoConcorrenciaIntegrationTest extends PostgresIntegrationTest {
 		);
 	}
 
+	@ParameterizedTest(name = "deve rejeitar sobreposição de {0} até {1}")
+	@CsvSource({
+			"2030-01-07T09:00:00-03:00, 2030-01-07T09:30:00-03:00",
+			"2030-01-07T08:45:00-03:00, 2030-01-07T09:15:00-03:00",
+			"2030-01-07T09:15:00-03:00, 2030-01-07T09:45:00-03:00",
+			"2030-01-07T09:05:00-03:00, 2030-01-07T09:25:00-03:00",
+			"2030-01-07T08:45:00-03:00, 2030-01-07T09:45:00-03:00"
+	})
+	void deveRejeitarTodasAsFormasDeSobreposicao(String inicio, String fim) {
+		inserirAgendamento(
+				"2030-01-07T09:00:00-03:00",
+				"2030-01-07T09:30:00-03:00",
+				StatusAgendamento.CONFIRMADO
+		);
+
+		assertThrows(
+				DataIntegrityViolationException.class,
+				() -> inserirAgendamento(inicio, fim, StatusAgendamento.AGENDADO)
+		);
+	}
+
+	@Test
+	void devePermitirAgendamentosExatamenteAdjacentes() {
+		inserirAgendamento(
+				"2030-01-07T09:00:00-03:00",
+				"2030-01-07T09:30:00-03:00",
+				StatusAgendamento.CONFIRMADO
+		);
+		inserirAgendamento(
+				"2030-01-07T08:30:00-03:00",
+				"2030-01-07T09:00:00-03:00",
+				StatusAgendamento.AGENDADO
+		);
+		inserirAgendamento(
+				"2030-01-07T09:30:00-03:00",
+				"2030-01-07T10:00:00-03:00",
+				StatusAgendamento.AGENDADO
+		);
+
+		assertEquals(3, quantidadeAgendamentos());
+	}
+
+	@ParameterizedTest
+	@EnumSource(value = StatusAgendamento.class, names = { "CANCELADO", "CONCLUIDO" })
+	void estadosEncerradosNaoDevemBloquearOHorario(StatusAgendamento status) {
+		inserirAgendamento(
+				"2030-01-07T09:00:00-03:00",
+				"2030-01-07T09:30:00-03:00",
+				status
+		);
+		inserirAgendamento(
+				"2030-01-07T09:00:00-03:00",
+				"2030-01-07T09:30:00-03:00",
+				StatusAgendamento.AGENDADO
+		);
+
+		assertEquals(2, quantidadeAgendamentos());
+	}
+
 	private boolean inserirConcorrentemente(
 			CountDownLatch prontas,
 			CountDownLatch iniciar
@@ -163,11 +233,12 @@ class AgendamentoConcorrenciaIntegrationTest extends PostgresIntegrationTest {
 
 			jdbcTemplate.update(
 					"INSERT INTO agendamentos "
-					+ "(cliente_id, profissional_id, servico_id, inicio, fim, status) "
-					+ "VALUES (?, ?, ?, ?, ?, 'AGENDADO')",
+					+ "(cliente_id, profissional_id, servico_id, barbearia_id, inicio, fim, status) "
+					+ "VALUES (?, ?, ?, ?, ?, ?, 'AGENDADO')",
 					clienteId,
 					profissionalId,
 					servicoId,
+					barbeariaId,
 					OffsetDateTime.parse("2030-01-07T09:00:00-03:00"),
 					OffsetDateTime.parse("2030-01-07T09:30:00-03:00")
 			);
@@ -194,14 +265,22 @@ class AgendamentoConcorrenciaIntegrationTest extends PostgresIntegrationTest {
 	) {
 		jdbcTemplate.update(
 				"INSERT INTO agendamentos "
-				+ "(cliente_id, profissional_id, servico_id, inicio, fim, status) "
-				+ "VALUES (?, ?, ?, ?, ?, ?)",
+				+ "(cliente_id, profissional_id, servico_id, barbearia_id, inicio, fim, status) "
+				+ "VALUES (?, ?, ?, ?, ?, ?, ?)",
 				clienteId,
 				profissionalId,
 				servicoId,
+				barbeariaId,
 				OffsetDateTime.parse(inicio),
 				OffsetDateTime.parse(fim),
 				status.name()
+		);
+	}
+
+	private int quantidadeAgendamentos() {
+		return jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM agendamentos",
+				Integer.class
 		);
 	}
 }

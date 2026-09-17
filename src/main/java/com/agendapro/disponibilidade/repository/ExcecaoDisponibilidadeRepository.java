@@ -15,6 +15,7 @@ public interface ExcecaoDisponibilidadeRepository
 		extends JpaRepository<ExcecaoDisponibilidade, Long> {
 
 	boolean existsByIdAndProfissionalUsuarioIdAndProfissionalAtivoTrue(Long id, Long usuarioId);
+	boolean existsByIdAndProfissionalBarbeariaProprietarioUsuarioIdAndProfissionalAtivoTrue(Long id, Long usuarioId);
 
 	@Override
 	@EntityGraph(attributePaths = "profissional")

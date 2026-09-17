@@ -2,6 +2,7 @@ package com.agendapro.usuario.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -18,8 +19,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
 import com.agendapro.usuario.entity.Usuario;
+import com.agendapro.usuario.entity.PerfilUsuario;
 import com.agendapro.usuario.exception.EmailJaCadastradoException;
 import com.agendapro.usuario.exception.UsuarioNaoEncontradoException;
 import com.agendapro.usuario.repository.UsuarioRepository;
@@ -160,6 +166,40 @@ class UsuarioServiceTest {
 		assertFalse(usuario.isAtivo());
 
 		verify(usuarioRepository).findById(id);
-		verify(usuarioRepository, never()).delete(any());
+		verify(usuarioRepository, never()).delete(any(Usuario.class));
+	}
+
+	@Test
+	void deveReativarUsuarioExistente() {
+		Long id = 1L;
+		Usuario usuario = new Usuario("Marcelo", "marcelo@email.com");
+		usuario.desativar();
+		when(usuarioRepository.findById(id)).thenReturn(Optional.of(usuario));
+
+		Usuario resultado = usuarioService.reativar(id);
+
+		assertTrue(resultado.isAtivo());
+		verify(usuarioRepository).findById(id);
+		verify(usuarioRepository, never()).save(any());
+	}
+
+	@Test
+	void deveListarUsuariosParaAdministracaoComFiltros() {
+		Usuario usuario = new Usuario("Marcelo", "marcelo@email.com");
+		PageRequest pagina = PageRequest.of(0, 20, Sort.by("nome"));
+		when(usuarioRepository.findAll(
+				org.mockito.ArgumentMatchers.<Specification<Usuario>>any(),
+				org.mockito.ArgumentMatchers.eq(pagina)
+		)).thenReturn(new PageImpl<>(List.of(usuario), pagina, 1));
+
+		var resultado = usuarioService.listarParaAdministracao(
+				"marcelo",
+				true,
+				PerfilUsuario.CLIENTE,
+				pagina
+		);
+
+		assertEquals(1, resultado.getTotalElements());
+		assertSame(usuario, resultado.getContent().get(0));
 	}
 }

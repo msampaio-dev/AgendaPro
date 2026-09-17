@@ -61,6 +61,17 @@ public class ProfissionalServicoController {
 				.toList();
 	}
 
+	@GetMapping("/por-servico")
+	public List<ProfissionalServicoResponse> listarAtivosPorServico(
+			@RequestParam Long servicoId
+	) {
+		return profissionalServicoService
+				.listarAtivosPorServico(servicoId)
+				.stream()
+				.map(ProfissionalServicoResponse::from)
+				.toList();
+	}
+
 	@DeleteMapping("/{id}")
 	@PreAuthorize("@profissionalAuthorization.podeGerenciarAssociacao(#id, authentication)")
 	@ResponseStatus(HttpStatus.NO_CONTENT)

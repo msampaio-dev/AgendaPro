@@ -34,31 +34,42 @@ public class ProfissionalAuthorization {
 		}
 		Long usuarioId = usuarioId(authentication);
 		return profissional(authentication) && usuarioId != null
-				&& profissionalRepository.existsByIdAndUsuarioIdAndAtivoTrue(profissionalId, usuarioId);
+				&& (profissionalRepository.existsByIdAndUsuarioIdAndAtivoTrue(profissionalId, usuarioId)
+						|| profissionalRepository
+								.existsByIdAndBarbeariaProprietarioUsuarioIdAndAtivoTrue(profissionalId, usuarioId));
 	}
 
 	public boolean podeGerenciarAssociacao(Long associacaoId, Authentication authentication) {
 		if (administrador(authentication)) return true;
 		Long usuarioId = usuarioId(authentication);
 		return profissional(authentication) && usuarioId != null
-				&& profissionalServicoRepository
-						.existsByIdAndProfissionalUsuarioIdAndProfissionalAtivoTrue(associacaoId, usuarioId);
+				&& (profissionalServicoRepository
+						.existsByIdAndProfissionalUsuarioIdAndProfissionalAtivoTrue(associacaoId, usuarioId)
+						|| profissionalServicoRepository
+								.existsByIdAndProfissionalBarbeariaProprietarioUsuarioIdAndProfissionalAtivoTrue(
+										associacaoId, usuarioId));
 	}
 
 	public boolean podeGerenciarHorario(Long horarioId, Authentication authentication) {
 		if (administrador(authentication)) return true;
 		Long usuarioId = usuarioId(authentication);
 		return profissional(authentication) && usuarioId != null
-				&& horarioRepository
-						.existsByIdAndProfissionalUsuarioIdAndProfissionalAtivoTrue(horarioId, usuarioId);
+				&& (horarioRepository
+						.existsByIdAndProfissionalUsuarioIdAndProfissionalAtivoTrue(horarioId, usuarioId)
+						|| horarioRepository
+								.existsByIdAndProfissionalBarbeariaProprietarioUsuarioIdAndProfissionalAtivoTrue(
+										horarioId, usuarioId));
 	}
 
 	public boolean podeGerenciarExcecao(Long excecaoId, Authentication authentication) {
 		if (administrador(authentication)) return true;
 		Long usuarioId = usuarioId(authentication);
 		return profissional(authentication) && usuarioId != null
-				&& excecaoRepository
-						.existsByIdAndProfissionalUsuarioIdAndProfissionalAtivoTrue(excecaoId, usuarioId);
+				&& (excecaoRepository
+						.existsByIdAndProfissionalUsuarioIdAndProfissionalAtivoTrue(excecaoId, usuarioId)
+						|| excecaoRepository
+								.existsByIdAndProfissionalBarbeariaProprietarioUsuarioIdAndProfissionalAtivoTrue(
+										excecaoId, usuarioId));
 	}
 
 	private boolean administrador(Authentication authentication) {

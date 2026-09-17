@@ -8,8 +8,11 @@ public record ProfissionalResponse(
 		Long usuarioId,
 		String nome,
 		String email,
+		Long barbeariaId,
+		String barbeariaNome,
 		boolean ativo,
-		String fusoHorario
+		String fusoHorario,
+		String fotoUrl
 ) {
 
 	public static ProfissionalResponse from(Profissional profissional) {
@@ -20,8 +23,11 @@ public record ProfissionalResponse(
 				usuario.getId(),
 				usuario.getNome(),
 				usuario.getEmail(),
+				profissional.getBarbearia() == null ? null : profissional.getBarbearia().getId(),
+				profissional.getBarbearia() == null ? null : profissional.getBarbearia().getNome(),
 				profissional.isAtivo(),
-				profissional.getFusoHorario().getId()
+				profissional.getFusoHorario().getId(),
+				profissional.getFotoUrl()
 		);
 	}
 }

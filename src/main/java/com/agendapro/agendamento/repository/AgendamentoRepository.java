@@ -18,22 +18,42 @@ import com.agendapro.agendamento.entity.StatusAgendamento;
 public interface AgendamentoRepository extends JpaRepository<Agendamento, Long>, JpaSpecificationExecutor<Agendamento> {
 
 	@Override
-	@EntityGraph(attributePaths = {"cliente", "profissional", "servico"})
+	@EntityGraph(attributePaths = {"cliente", "profissional", "profissional.usuario", "barbearia", "servico", "servicoAdicional"})
 	Optional<Agendamento> findById(Long id);
 
 	@Override
-	@EntityGraph(attributePaths = {"cliente", "profissional", "servico"})
+	@EntityGraph(attributePaths = {"cliente", "profissional", "profissional.usuario", "barbearia", "servico", "servicoAdicional"})
 	Page<Agendamento> findAll(Specification<Agendamento> specification, Pageable pageable);
 
 	boolean existsByIdAndClienteId(Long id, Long clienteId);
 
 	boolean existsByIdAndProfissionalUsuarioIdAndProfissionalAtivoTrue(Long id, Long usuarioId);
 
+	boolean existsByIdAndBarbeariaProprietarioUsuarioIdAndBarbeariaAtivoTrue(Long id, Long usuarioId);
+
 	boolean existsByProfissionalIdAndStatusInAndInicioLessThanAndFimGreaterThan(
 			Long profissionalId,
 			Collection<StatusAgendamento> status,
 			Instant novoFim,
 			Instant novoInicio
+	);
+
+	boolean existsByProfissionalIdAndStatusInAndInicioAfter(
+			Long profissionalId,
+			Collection<StatusAgendamento> status,
+			Instant inicio
+	);
+
+	boolean existsByBarbeariaIdAndStatusInAndInicioAfter(
+			Long barbeariaId,
+			Collection<StatusAgendamento> status,
+			Instant inicio
+	);
+
+	List<Agendamento> findAllByBarbeariaIdAndStatusInAndInicioAfterOrderByInicio(
+			Long barbeariaId,
+			Collection<StatusAgendamento> status,
+			Instant inicio
 	);
 
 	List<Agendamento> findAllByProfissionalIdAndStatusInAndInicioLessThanAndFimGreaterThanOrderByInicio(

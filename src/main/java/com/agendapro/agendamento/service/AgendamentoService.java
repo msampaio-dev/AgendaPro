@@ -77,17 +77,28 @@ public class AgendamentoService {
 			LocalDate data,
 			LocalTime horarioInicio
 	) {
+		return agendar(clienteId, profissionalId, servicoId, null, data, horarioInicio);
+	}
+
+	@Transactional
+	public Agendamento agendar(
+			Long clienteId,
+			Long profissionalId,
+			Long servicoId,
+			Long servicoAdicionalId,
+			LocalDate data,
+			LocalTime horarioInicio
+	) {
 		Usuario cliente = usuarioService.buscarPorId(clienteId);
 
 		if (!cliente.isAtivo()) {
 			throw new UsuarioInativoException(clienteId);
 		}
 
-		DisponibilidadeResponse disponibilidade = disponibilidadeService.consultar(
-				profissionalId,
-				servicoId,
-				data
-		);
+		DisponibilidadeResponse disponibilidade = servicoAdicionalId == null
+				? disponibilidadeService.consultar(profissionalId, servicoId, data)
+				: disponibilidadeService.consultar(
+						profissionalId, servicoId, servicoAdicionalId, data);
 
 		HorarioDisponivelResponse horario = disponibilidade.horarios()
 				.stream()
@@ -97,6 +108,11 @@ public class AgendamentoService {
 
 		Profissional profissional = profissionalService.buscarPorId(profissionalId);
 		Servico servico = servicoService.buscarPorId(servicoId);
+		Servico servicoAdicional = servicoAdicionalId == null
+				? null
+				: servicoService.buscarPorId(servicoAdicionalId);
+		int duracaoTotal = servico.getDuracaoMinutos()
+				+ (servicoAdicional == null ? 0 : servicoAdicional.getDuracaoMinutos());
 
 		Instant inicio = converterParaInstant(
 				data,
@@ -114,7 +130,7 @@ public class AgendamentoService {
 		}
 
 		if (Duration.between(inicio, fim).toMinutes()
-				!= servico.getDuracaoMinutos()) {
+				!= duracaoTotal) {
 			throw new HorarioLocalInvalidoException();
 		}
 
@@ -134,6 +150,7 @@ public class AgendamentoService {
 				cliente,
 				profissional,
 				servico,
+				servicoAdicional,
 				inicio,
 				fim
 		);
@@ -195,6 +212,45 @@ public class AgendamentoService {
 		Specification<Agendamento> filtro = (root, query, builder) ->
 				builder.equal(root.get("cliente").get("id"), clienteId);
 
+		if (status != null) {
+			filtro = filtro.and((root, query, builder) ->
+					builder.equal(root.get("status"), status));
+		}
+		if (inicioDe != null) {
+			Instant inicio = inicioDe.toInstant();
+			filtro = filtro.and((root, query, builder) ->
+					builder.greaterThanOrEqualTo(root.get("inicio"), inicio));
+		}
+		if (inicioAntesDe != null) {
+			Instant fim = inicioAntesDe.toInstant();
+			filtro = filtro.and((root, query, builder) ->
+					builder.lessThan(root.get("inicio"), fim));
+		}
+
+		return agendamentoRepository.findAll(filtro, normalizarPaginacao(pageable));
+	}
+
+	@Transactional(readOnly = true)
+	public Page<Agendamento> listarParaAdministracao(
+			Long profissionalId,
+			OffsetDateTime inicioDe,
+			OffsetDateTime inicioAntesDe,
+			StatusAgendamento status,
+			Pageable pageable
+	) {
+		validarIntervalo(inicioDe, inicioAntesDe);
+
+		if (profissionalId != null) {
+			profissionalService.buscarPorId(profissionalId);
+		}
+
+		Specification<Agendamento> filtro = (root, query, builder) ->
+				builder.conjunction();
+
+		if (profissionalId != null) {
+			filtro = filtro.and((root, query, builder) ->
+					builder.equal(root.get("profissional").get("id"), profissionalId));
+		}
 		if (status != null) {
 			filtro = filtro.and((root, query, builder) ->
 					builder.equal(root.get("status"), status));
@@ -303,6 +359,18 @@ public class AgendamentoService {
 				Math.min(pageable.getPageSize(), 100),
 				ordenacao
 		);
+	}
+
+	private void validarIntervalo(
+			OffsetDateTime inicioDe,
+			OffsetDateTime inicioAntesDe
+	) {
+		if (inicioDe != null && inicioAntesDe != null
+				&& !inicioDe.isBefore(inicioAntesDe)) {
+			throw new FiltroAgendamentoInvalidoException(
+					"inicioDe deve ser anterior a inicioAntesDe"
+			);
+		}
 	}
 
 	private Instant converterParaInstant(

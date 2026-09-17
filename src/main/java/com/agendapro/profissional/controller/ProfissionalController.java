@@ -13,12 +13,16 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.agendapro.profissional.dto.CadastroProfissionalRequest;
 import com.agendapro.profissional.dto.ProfissionalResponse;
+import com.agendapro.profissional.dto.TransferenciaProfissionalRequest;
 import com.agendapro.profissional.entity.Profissional;
 import com.agendapro.profissional.service.ProfissionalService;
+import com.agendapro.profissional.service.TransferenciaProfissionalService;
 
 import jakarta.validation.Valid;
 
@@ -27,9 +31,14 @@ import jakarta.validation.Valid;
 public class ProfissionalController {
 
 	private final ProfissionalService profissionalService;
+	private final TransferenciaProfissionalService transferenciaService;
 
-	public ProfissionalController(ProfissionalService profissionalService) {
+	public ProfissionalController(
+			ProfissionalService profissionalService,
+			TransferenciaProfissionalService transferenciaService
+	) {
 		this.profissionalService = profissionalService;
+		this.transferenciaService = transferenciaService;
 	}
 
 	@PostMapping
@@ -38,7 +47,7 @@ public class ProfissionalController {
 	public ProfissionalResponse cadastrar(
 			@Valid @RequestBody CadastroProfissionalRequest request
 	) {
-		Profissional profissional = profissionalService.cadastrar(request.usuarioId());
+		Profissional profissional = profissionalService.cadastrar(request.usuarioId(), request.barbeariaId());
 
 		return ProfissionalResponse.from(profissional);
 	}
@@ -51,11 +60,24 @@ public class ProfissionalController {
 	}
 
 	@GetMapping
-	public List<ProfissionalResponse> listar() {
-		return profissionalService.listar()
+	public List<ProfissionalResponse> listar(@RequestParam(required = false) Long barbeariaId) {
+		var profissionais = barbeariaId == null
+				? profissionalService.listar()
+				: profissionalService.listarPorBarbearia(barbeariaId);
+		return profissionais
 				.stream()
 				.map(ProfissionalResponse::from)
 				.toList();
+	}
+
+	@PatchMapping("/{id}/barbearia")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ProfissionalResponse transferir(
+			@PathVariable Long id,
+			@Valid @RequestBody TransferenciaProfissionalRequest request
+	) {
+		return ProfissionalResponse.from(
+				transferenciaService.transferir(id, request.barbeariaId()));
 	}
 
 	@DeleteMapping("/{id}")

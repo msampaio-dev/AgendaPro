@@ -7,6 +7,7 @@ public record DisponibilidadeResponse(
 		Long profissionalId,
 		Long servicoId,
 		LocalDate data,
+		SituacaoDisponibilidade situacao,
 		List<HorarioDisponivelResponse> horarios
 ) {
 }
