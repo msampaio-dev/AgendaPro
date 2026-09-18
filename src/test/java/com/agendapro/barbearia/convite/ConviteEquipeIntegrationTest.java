@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import com.agendapro.agendamento.repository.AgendamentoRepository;
 import com.agendapro.barbearia.convite.entity.ConviteEquipe;
 import com.agendapro.barbearia.convite.entity.StatusConviteEquipe;
 import com.agendapro.barbearia.convite.exception.OperacaoConviteEquipeConflitanteException;
@@ -33,6 +34,8 @@ class ConviteEquipeIntegrationTest extends PostgresIntegrationTest {
 	@Autowired
 	private ConviteEquipeRepository conviteRepository;
 	@Autowired
+	private AgendamentoRepository agendamentoRepository;
+	@Autowired
 	private ProfissionalRepository profissionalRepository;
 	@Autowired
 	private BarbeariaRepository barbeariaRepository;
@@ -41,7 +44,11 @@ class ConviteEquipeIntegrationTest extends PostgresIntegrationTest {
 
 	@BeforeEach
 	void limparBanco() {
+		// Na ordem inversa das chaves estrangeiras: o contexto do Spring e o banco
+		// são compartilhados com as demais classes de teste de mesma configuração,
+		// então pode haver agendamentos remanescentes apontando para profissionais.
 		conviteRepository.deleteAll();
+		agendamentoRepository.deleteAll();
 		profissionalRepository.deleteAll();
 		barbeariaRepository.deleteAll();
 		usuarioRepository.deleteAll();
