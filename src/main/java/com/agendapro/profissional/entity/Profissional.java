@@ -97,4 +97,10 @@ public class Profissional {
 	public void desativar() {
 		this.ativo = false;
 	}
+
+	public void ativarNaBarbearia(Barbearia barbearia) {
+		this.barbearia = barbearia;
+		this.fusoHorario = barbearia.getFusoHorario();
+		this.ativo = true;
+	}
 }
