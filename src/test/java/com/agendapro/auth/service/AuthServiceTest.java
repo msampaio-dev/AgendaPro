@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -35,6 +34,9 @@ class AuthServiceTest {
 
 	@Mock
 	private PasswordEncoder passwordEncoder;
+
+	@Mock
+	private LoginRateLimiter rateLimiter;
 
 	@InjectMocks
 	private AuthService authService;
@@ -71,7 +73,8 @@ class AuthServiceTest {
 		assertThrows(CredenciaisInvalidasException.class,
 				() -> authService.autenticar("ausente@agendapro.com", "senha-segura"));
 
-		verify(passwordEncoder, never()).matches(org.mockito.ArgumentMatchers.any(),
+		// matches deve rodar mesmo sem usuário, pra não vazar por timing se o e-mail existe
+		verify(passwordEncoder).matches(org.mockito.ArgumentMatchers.eq("senha-segura"),
 				org.mockito.ArgumentMatchers.any());
 	}
 
@@ -85,8 +88,7 @@ class AuthServiceTest {
 		assertThrows(CredenciaisInvalidasException.class,
 				() -> authService.autenticar("marcelo@agendapro.com", "senha-segura"));
 
-		verify(passwordEncoder, never()).matches(org.mockito.ArgumentMatchers.any(),
-				org.mockito.ArgumentMatchers.any());
+		verify(passwordEncoder).matches("senha-segura", "hash-bcrypt");
 	}
 
 	@Test
