@@ -1,0 +1,36 @@
+# Blueprint do Render para a API do AgendaPro.
+#
+# O banco NAO e declarado aqui de proposito: a instancia PostgreSQL gratuita do
+# Render expira em 30 dias, o que derrubaria a demonstracao sozinha. O banco fica
+# no Neon (free, sem expiracao) e chega pela variavel DB_URL.
+services:
+  - type: web
+    name: agendapro-api
+    runtime: docker
+    plan: free
+    region: oregon
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+
+      # Documentacao interativa fica ligada: e parte do que se quer mostrar.
+      - key: SWAGGER_ENABLED
+        value: "true"
+
+      # Carrega as barbearias, equipes, servicos e horarios de demonstracao,
+      # para quem abre o link nao encontrar um sistema vazio.
+      - key: FLYWAY_LOCATIONS
+        value: classpath:db/migration,classpath:db/devdata
+
+      # Preenchidos manualmente no painel do Render (Environment).
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
