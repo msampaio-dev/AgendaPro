@@ -16,13 +16,21 @@ public record ProfissionalResponse(
 ) {
 
 	public static ProfissionalResponse from(Profissional profissional) {
+		return from(profissional, true);
+	}
+
+	public static ProfissionalResponse publico(Profissional profissional) {
+		return from(profissional, false);
+	}
+
+	private static ProfissionalResponse from(Profissional profissional, boolean incluirEmail) {
 		Usuario usuario = profissional.getUsuario();
 
 		return new ProfissionalResponse(
 				profissional.getId(),
 				usuario.getId(),
 				usuario.getNome(),
-				usuario.getEmail(),
+				incluirEmail ? usuario.getEmail() : null,
 				profissional.getBarbearia() == null ? null : profissional.getBarbearia().getId(),
 				profissional.getBarbearia() == null ? null : profissional.getBarbearia().getNome(),
 				profissional.isAtivo(),

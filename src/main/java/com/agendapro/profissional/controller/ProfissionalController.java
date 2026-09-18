@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,6 +24,8 @@ import com.agendapro.profissional.dto.TransferenciaProfissionalRequest;
 import com.agendapro.profissional.entity.Profissional;
 import com.agendapro.profissional.service.ProfissionalService;
 import com.agendapro.profissional.service.TransferenciaProfissionalService;
+import com.agendapro.security.BarbeariaAuthorization;
+import com.agendapro.security.ProfissionalAuthorization;
 
 import jakarta.validation.Valid;
 
@@ -32,13 +35,19 @@ public class ProfissionalController {
 
 	private final ProfissionalService profissionalService;
 	private final TransferenciaProfissionalService transferenciaService;
+	private final ProfissionalAuthorization profissionalAuthorization;
+	private final BarbeariaAuthorization barbeariaAuthorization;
 
 	public ProfissionalController(
 			ProfissionalService profissionalService,
-			TransferenciaProfissionalService transferenciaService
+			TransferenciaProfissionalService transferenciaService,
+			ProfissionalAuthorization profissionalAuthorization,
+			BarbeariaAuthorization barbeariaAuthorization
 	) {
 		this.profissionalService = profissionalService;
 		this.transferenciaService = transferenciaService;
+		this.profissionalAuthorization = profissionalAuthorization;
+		this.barbeariaAuthorization = barbeariaAuthorization;
 	}
 
 	@PostMapping
@@ -53,20 +62,30 @@ public class ProfissionalController {
 	}
 
 	@GetMapping("/{id}")
-	public ProfissionalResponse buscarPorId(@PathVariable Long id) {
+	public ProfissionalResponse buscarPorId(@PathVariable Long id, Authentication authentication) {
 		Profissional profissional = profissionalService.buscarPorId(id);
 
-		return ProfissionalResponse.from(profissional);
+		return profissionalAuthorization.podeGerenciar(id, authentication)
+				? ProfissionalResponse.from(profissional)
+				: ProfissionalResponse.publico(profissional);
 	}
 
 	@GetMapping
-	public List<ProfissionalResponse> listar(@RequestParam(required = false) Long barbeariaId) {
+	@PreAuthorize("#barbeariaId != null or hasRole('ADMIN')")
+	public List<ProfissionalResponse> listar(
+			@RequestParam(required = false) Long barbeariaId,
+			Authentication authentication
+	) {
 		var profissionais = barbeariaId == null
 				? profissionalService.listar()
 				: profissionalService.listarPorBarbearia(barbeariaId);
+		// Sem barbeariaId só admin chega aqui (@PreAuthorize); com barbeariaId,
+		// só quem administra aquela unidade vê o e-mail da própria equipe.
+		boolean podeVerDetalhes = barbeariaId == null
+				|| barbeariaAuthorization.podeGerenciar(barbeariaId, authentication);
 		return profissionais
 				.stream()
-				.map(ProfissionalResponse::from)
+				.map(podeVerDetalhes ? ProfissionalResponse::from : ProfissionalResponse::publico)
 				.toList();
 	}
 
