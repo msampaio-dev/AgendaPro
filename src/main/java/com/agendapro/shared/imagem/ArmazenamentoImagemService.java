@@ -3,21 +3,26 @@ package com.agendapro.shared.imagem;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
+import java.time.Clock;
 import java.util.Map;
 import java.util.UUID;
 
 import javax.imageio.ImageIO;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * Guarda e devolve as imagens enviadas.
+ *
+ * O armazenamento vive no banco: o disco do ambiente publicado e efemero e
+ * perdia as fotos a cada reimplantacao. Toda a aplicacao fala com esta classe,
+ * e so ela sabe onde os bytes estao — trocar por um object storage no futuro
+ * fica contido aqui.
+ */
 @Service
 public class ArmazenamentoImagemService {
 	private static final long TAMANHO_MAXIMO = 5L * 1024 * 1024;
@@ -27,63 +32,50 @@ public class ArmazenamentoImagemService {
 			MediaType.IMAGE_PNG_VALUE, ".png"
 	);
 
-	private final Path diretorio;
+	private final ImagemRepository repository;
+	private final Clock clock;
 
-	public ArmazenamentoImagemService(
-			@Value("${app.upload.directory:${user.dir}/uploads}") String diretorio
-	) {
-		this.diretorio = Path.of(diretorio).toAbsolutePath().normalize();
+	public ArmazenamentoImagemService(ImagemRepository repository, Clock clock) {
+		this.repository = repository;
+		this.clock = clock;
 	}
 
+	@Transactional
 	public String armazenar(MultipartFile arquivo, String prefixo) {
 		validar(arquivo);
 		String extensao = EXTENSOES.get(arquivo.getContentType());
 		String nome = prefixo + "-" + UUID.randomUUID() + extensao;
-		Path destino = diretorio.resolve(nome).normalize();
 
 		try {
-			Files.createDirectories(diretorio);
-			try (InputStream entrada = arquivo.getInputStream()) {
-				Files.copy(entrada, destino, StandardCopyOption.REPLACE_EXISTING);
-			}
+			repository.save(new Imagem(
+					nome,
+					arquivo.getContentType(),
+					arquivo.getBytes(),
+					clock.instant()
+			));
 			return "/api/v1/imagens/" + nome;
 		} catch (IOException exception) {
 			throw new ArmazenamentoImagemException(exception);
 		}
 	}
 
+	@Transactional(readOnly = true)
 	public ImagemArmazenada carregar(String nome) {
-		if (!Path.of(nome).getFileName().toString().equals(nome)) {
-			throw new ImagemInvalidaException("Nome de imagem inválido");
-		}
+		// A busca e por chave primaria: um nome forjado simplesmente nao existe,
+		// e nao ha caminho de arquivo para escapar como havia no disco.
+		Imagem imagem = repository.findById(nome)
+				.orElseThrow(ImagemNaoEncontradaException::new);
 
-		Path arquivo = diretorio.resolve(nome).normalize();
-		if (!arquivo.startsWith(diretorio) || !Files.isRegularFile(arquivo)) {
-			throw new ImagemNaoEncontradaException();
-		}
-
-		try {
-			Resource recurso = new UrlResource(arquivo.toUri());
-			String tipoDetectado = Files.probeContentType(arquivo);
-			MediaType tipo = tipoDetectado == null
-					? MediaType.APPLICATION_OCTET_STREAM
-					: MediaType.parseMediaType(tipoDetectado);
-			return new ImagemArmazenada(recurso, tipo);
-		} catch (IOException exception) {
-			throw new ArmazenamentoImagemException(exception);
-		}
+		return new ImagemArmazenada(
+				new ByteArrayResource(imagem.getConteudo()),
+				MediaType.parseMediaType(imagem.getTipoConteudo())
+		);
 	}
 
+	@Transactional
 	public void remover(String fotoUrl) {
 		if (fotoUrl == null || fotoUrl.isBlank()) return;
-		String nome = fotoUrl.substring(fotoUrl.lastIndexOf('/') + 1);
-		Path arquivo = diretorio.resolve(nome).normalize();
-		if (!arquivo.startsWith(diretorio)) return;
-		try {
-			Files.deleteIfExists(arquivo);
-		} catch (IOException exception) {
-			throw new ArmazenamentoImagemException(exception);
-		}
+		repository.deleteById(fotoUrl.substring(fotoUrl.lastIndexOf('/') + 1));
 	}
 
 	private void validar(MultipartFile arquivo) {
