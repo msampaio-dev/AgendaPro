@@ -12,6 +12,12 @@ ALTER TABLE servicos ADD COLUMN barbearia_id BIGINT;
 -- profissionais_servicos e agendamentos logo abaixo.
 ALTER TABLE servicos ADD COLUMN origem_migracao_id BIGINT;
 
+-- O nome deixa de ser unico na plataforma e passa a ser unico dentro da
+-- barbearia: duas barbearias podem oferecer "Barba" com precos diferentes.
+-- Precisa cair agora, e nao no fim: as copias abaixo repetem nomes de proposito
+-- e violariam a unicidade antiga.
+DROP INDEX uk_servicos_nome_normalizado;
+
 -- A dona de cada servico passa a ser a primeira barbearia que o utilizava.
 UPDATE servicos s
 SET barbearia_id = origem.barbearia_id
@@ -73,10 +79,6 @@ ADD CONSTRAINT fk_servicos_barbearia
 FOREIGN KEY (barbearia_id) REFERENCES barbearias (id);
 
 CREATE INDEX ix_servicos_barbearia ON servicos (barbearia_id);
-
--- O nome deixa de ser unico na plataforma e passa a ser unico dentro da
--- barbearia: duas barbearias podem oferecer "Barba" com precos diferentes.
-DROP INDEX uk_servicos_nome_normalizado;
 
 CREATE UNIQUE INDEX uk_servicos_barbearia_nome_normalizado
 ON servicos (barbearia_id, LOWER(BTRIM(nome)));
