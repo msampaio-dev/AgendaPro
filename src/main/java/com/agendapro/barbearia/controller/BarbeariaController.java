@@ -67,7 +67,7 @@ public class BarbeariaController {
 	@GetMapping("/minhas")
 	@PreAuthorize("hasRole('PROFISSIONAL')")
 	public List<BarbeariaResponse> listarMinhas(Authentication authentication) {
-		return service.listarDoProprietario(Long.valueOf(authentication.getName()))
+		return service.listarDoProfissional(Long.valueOf(authentication.getName()))
 				.stream().map(BarbeariaResponse::from).toList();
 	}
 

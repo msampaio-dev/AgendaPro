@@ -79,9 +79,28 @@ public class BarbeariaService {
 		return repository.findAllByAtivoTrueAndProprietarioIsNotNullOrderByNomeAsc();
 	}
 
+	/**
+	 * As unidades que o profissional administra: as que possui e tambem aquela
+	 * onde trabalha como membro da equipe. O contratado nao e dono, mas cuida do
+	 * proprio catalogo, entao a barbearia dele precisa aparecer aqui.
+	 */
 	@Transactional(readOnly = true)
-	public List<Barbearia> listarDoProprietario(Long usuarioId) {
-		return repository.findAllByProprietarioUsuarioId(usuarioId);
+	public List<Barbearia> listarDoProfissional(Long usuarioId) {
+		List<Barbearia> unidades =
+				new ArrayList<>(repository.findAllByProprietarioUsuarioId(usuarioId));
+
+		// Recarregada por findById de proposito: o grafo de entidades de la traz
+		// o proprietario, que a resposta precisa e que a sessao nao abriria de
+		// novo com open-in-view desligado.
+		profissionalRepository.findByUsuarioIdAndAtivoTrue(usuarioId)
+				.map(Profissional::getBarbearia)
+				.map(Barbearia::getId)
+				.filter(id -> unidades.stream()
+						.noneMatch(unidade -> unidade.getId().equals(id)))
+				.flatMap(repository::findById)
+				.ifPresent(unidades::add);
+
+		return unidades;
 	}
 
 	@Transactional
