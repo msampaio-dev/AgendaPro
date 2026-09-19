@@ -3,11 +3,19 @@
 # O banco NAO e declarado aqui de proposito: a instancia PostgreSQL gratuita do
 # Render expira em 30 dias, o que derrubaria a demonstracao sozinha. O banco fica
 # no Neon (free, sem expiracao) e chega pela variavel DB_URL.
+#
+# Por ficar fora daqui, uma regra que este blueprint nao consegue garantir
+# sozinho: o projeto no Neon precisa estar na MESMA regiao deste servico. O banco
+# nasceu em Sao Paulo com a API em Oregon, e cada query pagava ~320ms
+# atravessando o continente; com os dois em us-west-2 o custo caiu para ~4ms.
+# Se um dia a regiao daqui mudar, recrie o banco na nova: regiao do Neon nao se
+# altera depois que o projeto existe.
 services:
   - type: web
     name: agendapro-api
     runtime: docker
     plan: free
+    # us-west-2. O projeto do Neon precisa estar nesta mesma regiao.
     region: oregon
     healthCheckPath: /actuator/health
     envVars:
