@@ -24,6 +24,8 @@ import com.agendapro.profissional.repository.ProfissionalRepository;
 import com.agendapro.shared.PostgresIntegrationTest;
 import com.agendapro.usuario.entity.PerfilUsuario;
 import com.agendapro.usuario.entity.Usuario;
+import com.agendapro.profissionalservico.repository.ProfissionalServicoRepository;
+import com.agendapro.servico.repository.ServicoRepository;
 import com.agendapro.usuario.repository.UsuarioRepository;
 
 @SpringBootTest
@@ -39,6 +41,12 @@ class ConviteEquipeIntegrationTest extends PostgresIntegrationTest {
 	private ProfissionalRepository profissionalRepository;
 	@Autowired
 	private BarbeariaRepository barbeariaRepository;
+
+	@Autowired
+	private ProfissionalServicoRepository profissionalServicoRepository;
+
+	@Autowired
+	private ServicoRepository servicoRepository;
 	@Autowired
 	private UsuarioRepository usuarioRepository;
 
@@ -49,6 +57,8 @@ class ConviteEquipeIntegrationTest extends PostgresIntegrationTest {
 		// então pode haver agendamentos remanescentes apontando para profissionais.
 		conviteRepository.deleteAll();
 		agendamentoRepository.deleteAll();
+		profissionalServicoRepository.deleteAll();
+		servicoRepository.deleteAll();
 		profissionalRepository.deleteAll();
 		barbeariaRepository.deleteAll();
 		usuarioRepository.deleteAll();

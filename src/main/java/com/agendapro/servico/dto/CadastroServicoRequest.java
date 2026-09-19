@@ -10,6 +10,9 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 public record CadastroServicoRequest(
+		@NotNull(message = "A barbearia é obrigatória")
+		Long barbeariaId,
+
 		@NotBlank(message = "O nome é obrigatório")
 		@Size(max = 120, message = "O nome deve possuir no máximo 120 caracteres")
 		String nome,

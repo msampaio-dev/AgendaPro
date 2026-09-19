@@ -31,19 +31,31 @@ END
 WHERE u.email LIKE '%@demo.agendapro.local'
   AND NOT EXISTS (SELECT 1 FROM profissionais p WHERE p.usuario_id = u.id);
 
-INSERT INTO servicos (nome, descricao, duracao_minutos, preco, ativo) VALUES
-    ('Corte de cabelo Social', 'Corte clássico com acabamento social.', 30, 45.00, TRUE),
-    ('Corte de cabelo Degradê', 'Corte com transição em degradê e acabamento.', 45, 55.00, TRUE),
-    ('Barba', 'Modelagem e acabamento completo da barba.', 30, 30.00, TRUE)
-ON CONFLICT DO NOTHING;
+-- O catalogo pertence a barbearia, entao cada uma das tres recebe os proprios
+-- servicos. Os precos variam de propósito: e o que mostra que o catalogo nao e
+-- mais global.
+INSERT INTO servicos (barbearia_id, nome, descricao, duracao_minutos, preco, ativo)
+SELECT b.id, catalogo.nome, catalogo.descricao, catalogo.duracao, catalogo.preco, TRUE
+FROM barbearias b
+CROSS JOIN (VALUES
+    ('Corte de cabelo Social', 'Corte clássico com acabamento social.', 30, 45.00),
+    ('Corte de cabelo Degradê', 'Corte com transição em degradê e acabamento.', 45, 55.00),
+    ('Barba', 'Modelagem e acabamento completo da barba.', 30, 30.00)
+) AS catalogo(nome, descricao, duracao, preco)
+WHERE b.nome IN ('Barbershopping Ipanema', 'Barbearia da Comunidade', 'Barbershop Morumbi')
+  AND NOT EXISTS (
+      SELECT 1 FROM servicos s
+      WHERE s.barbearia_id = b.id
+        AND LOWER(BTRIM(s.nome)) = LOWER(BTRIM(catalogo.nome))
+  );
 
+-- Cada profissional executa os servicos da propria barbearia.
 INSERT INTO profissionais_servicos (profissional_id, servico_id, ativo)
 SELECT p.id, s.id, TRUE
 FROM profissionais p
 JOIN usuarios u ON u.id = p.usuario_id AND u.email LIKE '%@demo.agendapro.local'
-CROSS JOIN servicos s
-WHERE s.nome IN ('Corte de cabelo Social', 'Corte de cabelo Degradê', 'Barba')
-  AND NOT EXISTS (
+JOIN servicos s ON s.barbearia_id = p.barbearia_id
+WHERE NOT EXISTS (
       SELECT 1 FROM profissionais_servicos ps
       WHERE ps.profissional_id = p.id AND ps.servico_id = s.id
   );

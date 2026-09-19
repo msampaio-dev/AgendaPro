@@ -8,6 +8,7 @@ import java.time.Instant;
 
 import org.junit.jupiter.api.Test;
 
+import com.agendapro.barbearia.entity.Barbearia;
 import com.agendapro.agendamento.exception.TransicaoStatusAgendamentoInvalidaException;
 import com.agendapro.profissional.entity.Profissional;
 import com.agendapro.servico.entity.Servico;
@@ -66,7 +67,8 @@ class AgendamentoStatusTest {
 	private Agendamento novoAgendamento() {
 		Usuario cliente = new Usuario("Cliente", "cliente@agendapro.com");
 		Profissional profissional = new Profissional(new Usuario("Profissional", "pro@agendapro.com"));
-		Servico servico = new Servico("Corte", null, 30, new BigDecimal("50.00"));
+		Servico servico = new Servico(
+				"Corte", null, 30, new BigDecimal("50.00"), new Barbearia("Barbearia"));
 		return new Agendamento(
 				cliente,
 				profissional,

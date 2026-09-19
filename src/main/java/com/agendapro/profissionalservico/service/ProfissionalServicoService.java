@@ -10,6 +10,7 @@ import com.agendapro.profissional.exception.ProfissionalInativoException;
 import com.agendapro.profissional.service.ProfissionalService;
 import com.agendapro.profissionalservico.entity.ProfissionalServico;
 import com.agendapro.profissionalservico.exception.ProfissionalServicoJaCadastradoException;
+import com.agendapro.profissionalservico.exception.ServicoDeOutraBarbeariaException;
 import com.agendapro.profissionalservico.exception.ProfissionalServicoNaoEncontradoException;
 import com.agendapro.profissionalservico.exception.ProfissionalNaoRealizaServicoException;
 import com.agendapro.profissionalservico.repository.ProfissionalServicoRepository;
@@ -46,6 +47,12 @@ public class ProfissionalServicoService {
 
 		if (!servico.isAtivo()) {
 			throw new ServicoInativoException(servicoId);
+		}
+
+		// O catalogo pertence a barbearia: um profissional so executa servicos
+		// da barbearia onde trabalha.
+		if (!servico.getBarbearia().getId().equals(profissional.getBarbearia().getId())) {
+			throw new ServicoDeOutraBarbeariaException(profissionalId, servicoId);
 		}
 
 		var associacaoExistente = profissionalServicoRepository

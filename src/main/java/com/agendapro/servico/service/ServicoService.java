@@ -6,6 +6,10 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.agendapro.barbearia.entity.Barbearia;
+import com.agendapro.barbearia.exception.BarbeariaInativaException;
+import com.agendapro.barbearia.exception.BarbeariaNaoEncontradaException;
+import com.agendapro.barbearia.repository.BarbeariaRepository;
 import com.agendapro.servico.entity.Servico;
 import com.agendapro.servico.exception.ServicoJaCadastradoException;
 import com.agendapro.servico.exception.ServicoNaoEncontradoException;
@@ -15,22 +19,34 @@ import com.agendapro.servico.repository.ServicoRepository;
 public class ServicoService {
 
 	private final ServicoRepository servicoRepository;
+	private final BarbeariaRepository barbeariaRepository;
 
-	public ServicoService(ServicoRepository servicoRepository) {
+	public ServicoService(
+			ServicoRepository servicoRepository,
+			BarbeariaRepository barbeariaRepository
+	) {
 		this.servicoRepository = servicoRepository;
+		this.barbeariaRepository = barbeariaRepository;
 	}
 
 	@Transactional
 	public Servico cadastrar(
+			Long barbeariaId,
 			String nome,
 			String descricao,
 			Integer duracaoMinutos,
 			BigDecimal preco
 	) {
+		Barbearia barbearia = buscarBarbeariaAtiva(barbeariaId);
 		String nomeNormalizado = nome.trim();
 		String descricaoNormalizada = normalizarDescricao(descricao);
 
-		if (servicoRepository.existsByNomeIgnoreCase(nomeNormalizado)) {
+		// O nome e unico dentro da barbearia: duas barbearias podem oferecer
+		// "Barba" com duracoes e precos proprios.
+		if (servicoRepository.existsByBarbeariaIdAndNomeIgnoreCase(
+				barbeariaId,
+				nomeNormalizado
+		)) {
 			throw new ServicoJaCadastradoException(nomeNormalizado);
 		}
 
@@ -38,7 +54,8 @@ public class ServicoService {
 				nomeNormalizado,
 				descricaoNormalizada,
 				duracaoMinutos,
-				preco
+				preco,
+				barbearia
 		);
 
 		return servicoRepository.save(servico);
@@ -52,7 +69,20 @@ public class ServicoService {
 
 	@Transactional(readOnly = true)
 	public List<Servico> listar() {
-		return servicoRepository.findAll();
+		return servicoRepository.findAllByOrderByNomeAsc();
+	}
+
+	@Transactional(readOnly = true)
+	public List<Servico> listarPorBarbearia(Long barbeariaId) {
+		garantirBarbeariaExistente(barbeariaId);
+		return servicoRepository.findAllByBarbeariaIdOrderByNomeAsc(barbeariaId);
+	}
+
+	@Transactional(readOnly = true)
+	public List<Servico> listarAtivosPorBarbearia(Long barbeariaId) {
+		garantirBarbeariaExistente(barbeariaId);
+		return servicoRepository
+				.findAllByBarbeariaIdAndAtivoTrueOrderByNomeAsc(barbeariaId);
 	}
 
 	@Transactional
@@ -71,7 +101,10 @@ public class ServicoService {
 				!servico.getNome().equalsIgnoreCase(nomeNormalizado);
 
 		if (nomeFoiAlterado
-				&& servicoRepository.existsByNomeIgnoreCase(nomeNormalizado)) {
+				&& servicoRepository.existsByBarbeariaIdAndNomeIgnoreCase(
+						servico.getBarbearia().getId(),
+						nomeNormalizado
+				)) {
 			throw new ServicoJaCadastradoException(nomeNormalizado);
 		}
 
@@ -89,6 +122,23 @@ public class ServicoService {
 	public void desativar(Long id) {
 		Servico servico = buscarPorId(id);
 		servico.desativar();
+	}
+
+	private Barbearia buscarBarbeariaAtiva(Long barbeariaId) {
+		Barbearia barbearia = barbeariaRepository.findById(barbeariaId)
+				.orElseThrow(() -> new BarbeariaNaoEncontradaException(barbeariaId));
+
+		if (!barbearia.isAtivo()) {
+			throw new BarbeariaInativaException(barbeariaId);
+		}
+
+		return barbearia;
+	}
+
+	private void garantirBarbeariaExistente(Long barbeariaId) {
+		if (!barbeariaRepository.existsById(barbeariaId)) {
+			throw new BarbeariaNaoEncontradaException(barbeariaId);
+		}
 	}
 
 	private String normalizarDescricao(String descricao) {

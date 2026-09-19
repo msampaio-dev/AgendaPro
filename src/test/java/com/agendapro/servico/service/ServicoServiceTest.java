@@ -21,6 +21,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.test.util.ReflectionTestUtils;
+
+import com.agendapro.barbearia.entity.Barbearia;
+import com.agendapro.barbearia.exception.BarbeariaInativaException;
+import com.agendapro.barbearia.exception.BarbeariaNaoEncontradaException;
+import com.agendapro.barbearia.repository.BarbeariaRepository;
 import com.agendapro.servico.entity.Servico;
 import com.agendapro.servico.exception.ServicoJaCadastradoException;
 import com.agendapro.servico.exception.ServicoNaoEncontradoException;
@@ -29,21 +35,32 @@ import com.agendapro.servico.repository.ServicoRepository;
 @ExtendWith(MockitoExtension.class)
 class ServicoServiceTest {
 
+	private static final Long BARBEARIA_ID = 7L;
+
 	@Mock
 	private ServicoRepository servicoRepository;
+
+	@Mock
+	private BarbeariaRepository barbeariaRepository;
 
 	@InjectMocks
 	private ServicoService servicoService;
 
 	@Test
 	void deveCadastrarServicoQuandoNomeNaoExistir() {
-		when(servicoRepository.existsByNomeIgnoreCase("Corte de cabelo"))
+		Barbearia barbearia = novaBarbearia();
+
+		when(barbeariaRepository.findById(BARBEARIA_ID))
+				.thenReturn(Optional.of(barbearia));
+		when(servicoRepository.existsByBarbeariaIdAndNomeIgnoreCase(
+				BARBEARIA_ID, "Corte de cabelo"))
 				.thenReturn(false);
 
 		when(servicoRepository.save(any(Servico.class)))
 				.thenAnswer(invocacao -> invocacao.getArgument(0));
 
 		Servico resultado = servicoService.cadastrar(
+				BARBEARIA_ID,
 				" Corte de cabelo ",
 				"   ",
 				30,
@@ -55,19 +72,25 @@ class ServicoServiceTest {
 		assertEquals(30, resultado.getDuracaoMinutos());
 		assertEquals(new BigDecimal("50.00"), resultado.getPreco());
 		assertTrue(resultado.isAtivo());
+		assertSame(barbearia, resultado.getBarbearia());
 
-		verify(servicoRepository).existsByNomeIgnoreCase("Corte de cabelo");
+		verify(servicoRepository).existsByBarbeariaIdAndNomeIgnoreCase(
+				BARBEARIA_ID, "Corte de cabelo");
 		verify(servicoRepository).save(any(Servico.class));
 	}
 
 	@Test
 	void naoDeveCadastrarServicoQuandoNomeJaExistir() {
-		when(servicoRepository.existsByNomeIgnoreCase("Corte de cabelo"))
+		when(barbeariaRepository.findById(BARBEARIA_ID))
+				.thenReturn(Optional.of(novaBarbearia()));
+		when(servicoRepository.existsByBarbeariaIdAndNomeIgnoreCase(
+				BARBEARIA_ID, "Corte de cabelo"))
 				.thenReturn(true);
 
 		assertThrows(
 				ServicoJaCadastradoException.class,
 				() -> servicoService.cadastrar(
+						BARBEARIA_ID,
 						" Corte de cabelo ",
 						"Corte tradicional",
 						30,
@@ -75,7 +98,8 @@ class ServicoServiceTest {
 				)
 		);
 
-		verify(servicoRepository).existsByNomeIgnoreCase("Corte de cabelo");
+		verify(servicoRepository).existsByBarbeariaIdAndNomeIgnoreCase(
+				BARBEARIA_ID, "Corte de cabelo");
 		verify(servicoRepository, never()).save(any(Servico.class));
 	}
 
@@ -113,7 +137,7 @@ class ServicoServiceTest {
 		Servico primeiro = novoServico("Corte de cabelo");
 		Servico segundo = novoServico("Barba");
 
-		when(servicoRepository.findAll())
+		when(servicoRepository.findAllByOrderByNomeAsc())
 				.thenReturn(List.of(primeiro, segundo));
 
 		List<Servico> resultado = servicoService.listar();
@@ -121,7 +145,7 @@ class ServicoServiceTest {
 		assertEquals(2, resultado.size());
 		assertSame(primeiro, resultado.get(0));
 		assertSame(segundo, resultado.get(1));
-		verify(servicoRepository).findAll();
+		verify(servicoRepository).findAllByOrderByNomeAsc();
 	}
 
 	@Test
@@ -131,7 +155,8 @@ class ServicoServiceTest {
 
 		when(servicoRepository.findById(id))
 				.thenReturn(Optional.of(servico));
-		when(servicoRepository.existsByNomeIgnoreCase("Corte premium"))
+		when(servicoRepository.existsByBarbeariaIdAndNomeIgnoreCase(
+				BARBEARIA_ID, "Corte premium"))
 				.thenReturn(false);
 
 		Servico resultado = servicoService.atualizar(
@@ -147,7 +172,8 @@ class ServicoServiceTest {
 		assertEquals("Atendimento completo", resultado.getDescricao());
 		assertEquals(45, resultado.getDuracaoMinutos());
 		assertEquals(new BigDecimal("75.00"), resultado.getPreco());
-		verify(servicoRepository).existsByNomeIgnoreCase("Corte premium");
+		verify(servicoRepository).existsByBarbeariaIdAndNomeIgnoreCase(
+				BARBEARIA_ID, "Corte premium");
 		verify(servicoRepository, never()).save(any(Servico.class));
 	}
 
@@ -158,7 +184,8 @@ class ServicoServiceTest {
 
 		when(servicoRepository.findById(id))
 				.thenReturn(Optional.of(servico));
-		when(servicoRepository.existsByNomeIgnoreCase("Barba"))
+		when(servicoRepository.existsByBarbeariaIdAndNomeIgnoreCase(
+				BARBEARIA_ID, "Barba"))
 				.thenReturn(true);
 
 		assertThrows(
@@ -194,12 +221,74 @@ class ServicoServiceTest {
 		verify(servicoRepository, never()).save(any(Servico.class));
 	}
 
+	@Test
+	void naoDeveCadastrarServicoQuandoBarbeariaNaoExistir() {
+		when(barbeariaRepository.findById(BARBEARIA_ID))
+				.thenReturn(Optional.empty());
+
+		assertThrows(
+				BarbeariaNaoEncontradaException.class,
+				() -> servicoService.cadastrar(
+						BARBEARIA_ID,
+						"Corte de cabelo",
+						null,
+						30,
+						new BigDecimal("50.00")
+				)
+		);
+
+		verify(servicoRepository, never()).save(any(Servico.class));
+	}
+
+	@Test
+	void naoDeveCadastrarServicoQuandoBarbeariaEstiverInativa() {
+		Barbearia barbearia = novaBarbearia();
+		barbearia.desativar();
+
+		when(barbeariaRepository.findById(BARBEARIA_ID))
+				.thenReturn(Optional.of(barbearia));
+
+		assertThrows(
+				BarbeariaInativaException.class,
+				() -> servicoService.cadastrar(
+						BARBEARIA_ID,
+						"Corte de cabelo",
+						null,
+						30,
+						new BigDecimal("50.00")
+				)
+		);
+
+		verify(servicoRepository, never()).save(any(Servico.class));
+	}
+
+	@Test
+	void deveListarServicosDaBarbearia() {
+		Servico servico = novoServico("Barba");
+
+		when(barbeariaRepository.existsById(BARBEARIA_ID)).thenReturn(true);
+		when(servicoRepository.findAllByBarbeariaIdOrderByNomeAsc(BARBEARIA_ID))
+				.thenReturn(List.of(servico));
+
+		List<Servico> resultado = servicoService.listarPorBarbearia(BARBEARIA_ID);
+
+		assertEquals(1, resultado.size());
+		assertSame(servico, resultado.get(0));
+	}
+
+	private Barbearia novaBarbearia() {
+		Barbearia barbearia = new Barbearia("Barbearia");
+		ReflectionTestUtils.setField(barbearia, "id", BARBEARIA_ID);
+		return barbearia;
+	}
+
 	private Servico novoServico(String nome) {
 		return new Servico(
 				nome,
 				null,
 				30,
-				new BigDecimal("50.00")
+				new BigDecimal("50.00"),
+				novaBarbearia()
 		);
 	}
 }

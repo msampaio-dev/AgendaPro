@@ -35,4 +35,6 @@ public interface ProfissionalRepository extends JpaRepository<Profissional, Long
 	List<Profissional> findAllByBarbeariaId(Long barbeariaId);
 
 	boolean existsByBarbeariaIdAndAtivoTrue(Long barbeariaId);
+
+	boolean existsByBarbeariaIdAndUsuarioIdAndAtivoTrue(Long barbeariaId, Long usuarioId);
 }
