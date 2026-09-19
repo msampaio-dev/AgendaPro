@@ -35,3 +35,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### ai-memory ###
+# Configuracao local da memoria do agente: pertence a maquina, nao ao repositorio.
+.ai-memory.toml
