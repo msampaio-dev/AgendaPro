@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.agendapro.barbearia.entity.Barbearia;
 import com.agendapro.barbearia.dto.CadastroBarbeariaRequest;
@@ -140,6 +141,34 @@ class BarbeariaServiceTest {
 		assertEquals(barbearia, service.alterarProprietario(4L, 9L));
 
 		verify(barbearia).transferirPropriedadePara(novoProprietario);
+	}
+
+	@Test
+	void membroDaEquipeDeveEnxergarAUnidadeOndeTrabalha() {
+		Barbearia unidade = new Barbearia("Barbearia do Centro");
+		ReflectionTestUtils.setField(unidade, "id", 4L);
+		Profissional membro = new Profissional(
+				new Usuario("Ana", "ana@teste.com", "hash"), unidade);
+		when(repository.findAllByProprietarioUsuarioId(12L)).thenReturn(List.of());
+		when(profissionalRepository.findByUsuarioIdAndAtivoTrue(12L))
+				.thenReturn(java.util.Optional.of(membro));
+		when(repository.findById(4L)).thenReturn(java.util.Optional.of(unidade));
+
+		assertEquals(List.of(unidade), service.listarDoProfissional(12L));
+	}
+
+	@Test
+	void proprietarioNaoDeveReceberAPropriaUnidadeDuplicada() {
+		Barbearia unidade = new Barbearia("Barbearia do Centro");
+		ReflectionTestUtils.setField(unidade, "id", 4L);
+		Profissional dono = new Profissional(
+				new Usuario("João", "joao@teste.com", "hash"), unidade);
+		when(repository.findAllByProprietarioUsuarioId(7L)).thenReturn(List.of(unidade));
+		when(profissionalRepository.findByUsuarioIdAndAtivoTrue(7L))
+				.thenReturn(java.util.Optional.of(dono));
+
+		assertEquals(List.of(unidade), service.listarDoProfissional(7L));
+		verify(repository, never()).findById(4L);
 	}
 
 	private CadastroBarbeariaRequest requisicao(List<HorarioFuncionamentoRequest> horarios) {
