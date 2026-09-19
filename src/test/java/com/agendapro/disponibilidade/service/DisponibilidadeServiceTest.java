@@ -569,7 +569,8 @@ class DisponibilidadeServiceTest {
 				"Barba",
 				null,
 				duracaoMinutos,
-				new BigDecimal("35.00")
+				new BigDecimal("35.00"),
+				new Barbearia("Barbearia")
 		);
 	}
 

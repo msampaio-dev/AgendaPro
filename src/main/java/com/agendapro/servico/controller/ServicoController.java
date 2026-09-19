@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -35,12 +36,13 @@ public class ServicoController {
 	}
 
 	@PostMapping
-	@PreAuthorize("hasRole('ADMIN')")
+	@PreAuthorize("@servicoAuthorization.podeGerenciarCatalogo(#request.barbeariaId(), authentication)")
 	@ResponseStatus(HttpStatus.CREATED)
 	public ServicoResponse cadastrar(
 			@Valid @RequestBody CadastroServicoRequest request
 	) {
 		Servico servico = servicoService.cadastrar(
+				request.barbeariaId(),
 				request.nome(),
 				request.descricao(),
 				request.duracaoMinutos(),
@@ -56,15 +58,25 @@ public class ServicoController {
 	}
 
 	@GetMapping
-	public List<ServicoResponse> listar() {
-		return servicoService.listar()
-				.stream()
-				.map(ServicoResponse::from)
-				.toList();
+	public List<ServicoResponse> listar(
+			@RequestParam(required = false) Long barbeariaId,
+			@RequestParam(required = false, defaultValue = "false") boolean apenasAtivos
+	) {
+		List<Servico> servicos;
+
+		if (barbeariaId == null) {
+			servicos = servicoService.listar();
+		} else if (apenasAtivos) {
+			servicos = servicoService.listarAtivosPorBarbearia(barbeariaId);
+		} else {
+			servicos = servicoService.listarPorBarbearia(barbeariaId);
+		}
+
+		return servicos.stream().map(ServicoResponse::from).toList();
 	}
 
 	@PutMapping("/{id}")
-	@PreAuthorize("hasRole('ADMIN')")
+	@PreAuthorize("@servicoAuthorization.podeGerenciarServico(#id, authentication)")
 	public ServicoResponse atualizar(
 			@PathVariable Long id,
 			@Valid @RequestBody AtualizacaoServicoRequest request
@@ -81,7 +93,7 @@ public class ServicoController {
 	}
 
 	@DeleteMapping("/{id}")
-	@PreAuthorize("hasRole('ADMIN')")
+	@PreAuthorize("@servicoAuthorization.podeGerenciarServico(#id, authentication)")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void desativar(@PathVariable Long id) {
 		servicoService.desativar(id);

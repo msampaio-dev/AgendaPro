@@ -35,6 +35,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
+import com.agendapro.barbearia.entity.Barbearia;
 import com.agendapro.agendamento.entity.Agendamento;
 import com.agendapro.agendamento.entity.StatusAgendamento;
 import com.agendapro.agendamento.exception.AgendamentoNaoEncontradoException;
@@ -88,19 +89,23 @@ class AgendamentoServiceTest {
 	private Usuario cliente;
 	private Profissional profissional;
 	private Servico servico;
+	private Barbearia barbearia;
 
 	@BeforeEach
 	void prepararEntidades() {
 		lenient().when(clock.instant()).thenReturn(Instant.parse("2029-01-01T00:00:00Z"));
 		cliente = new Usuario("Cliente", "cliente@agendapro.com");
+		barbearia = new Barbearia("Barbearia");
 		profissional = new Profissional(
-				new Usuario("Ana", "ana@agendapro.com")
+				new Usuario("Ana", "ana@agendapro.com"),
+				barbearia
 		);
 		servico = new Servico(
 				"Barba",
 				null,
 				30,
-				new BigDecimal("35.00")
+				new BigDecimal("35.00"),
+				barbearia
 		);
 	}
 
@@ -131,7 +136,7 @@ class AgendamentoServiceTest {
 	@Test
 	void deveCriarAgendamentoComServicoAdicionalEDuracaoSomada() {
 		Servico adicional = new Servico(
-				"Barba", null, 30, new BigDecimal("30.00"));
+				"Barba", null, 30, new BigDecimal("30.00"), barbearia);
 		when(usuarioService.buscarPorId(CLIENTE_ID)).thenReturn(cliente);
 		when(disponibilidadeService.consultar(
 				PROFISSIONAL_ID, SERVICO_ID, SERVICO_ADICIONAL_ID, DATA))

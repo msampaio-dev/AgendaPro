@@ -10,7 +10,8 @@ public record ServicoResponse(
 		String descricao,
 		Integer duracaoMinutos,
 		BigDecimal preco,
-		boolean ativo
+		boolean ativo,
+		Long barbeariaId
 ) {
 
 	public static ServicoResponse from(Servico servico) {
@@ -20,7 +21,8 @@ public record ServicoResponse(
 				servico.getDescricao(),
 				servico.getDuracaoMinutos(),
 				servico.getPreco(),
-				servico.isAtivo()
+				servico.isAtivo(),
+				servico.getBarbearia().getId()
 		);
 	}
 }

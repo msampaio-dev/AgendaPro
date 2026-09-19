@@ -73,10 +73,11 @@ class AgendamentoConcorrenciaIntegrationTest extends PostgresIntegrationTest {
 		);
 		servicoId = jdbcTemplate.queryForObject(
 				"INSERT INTO servicos "
-				+ "(nome, descricao, duracao_minutos, preco, ativo) "
-				+ "VALUES ('Teste concorrente', NULL, 30, 50.00, TRUE) "
+				+ "(barbearia_id, nome, descricao, duracao_minutos, preco, ativo) "
+				+ "VALUES (?, 'Teste concorrente', NULL, 30, 50.00, TRUE) "
 				+ "RETURNING id",
-				Long.class
+				Long.class,
+				barbeariaId
 		);
 	}
 

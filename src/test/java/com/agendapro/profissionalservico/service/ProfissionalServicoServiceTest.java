@@ -20,6 +20,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.test.util.ReflectionTestUtils;
+
+import com.agendapro.barbearia.entity.Barbearia;
 import com.agendapro.profissional.entity.Profissional;
 import com.agendapro.profissional.exception.ProfissionalInativoException;
 import com.agendapro.profissional.service.ProfissionalService;
@@ -27,6 +30,7 @@ import com.agendapro.profissionalservico.entity.ProfissionalServico;
 import com.agendapro.profissionalservico.exception.ProfissionalServicoJaCadastradoException;
 import com.agendapro.profissionalservico.exception.ProfissionalServicoNaoEncontradoException;
 import com.agendapro.profissionalservico.exception.ProfissionalNaoRealizaServicoException;
+import com.agendapro.profissionalservico.exception.ServicoDeOutraBarbeariaException;
 import com.agendapro.profissionalservico.repository.ProfissionalServicoRepository;
 import com.agendapro.servico.entity.Servico;
 import com.agendapro.servico.exception.ServicoInativoException;
@@ -247,18 +251,52 @@ class ProfissionalServicoServiceTest {
 		);
 	}
 
+	@Test
+	void deveRecusarAssociacaoQuandoServicoForDeOutraBarbearia() {
+		Long profissionalId = 1L;
+		Long servicoId = 2L;
+		Profissional profissional = novoProfissional();
+		Servico servicoDeOutraBarbearia = novoServico(99L);
+
+		when(profissionalService.buscarPorId(profissionalId))
+				.thenReturn(profissional);
+		when(servicoService.buscarPorId(servicoId))
+				.thenReturn(servicoDeOutraBarbearia);
+
+		assertThrows(
+				ServicoDeOutraBarbeariaException.class,
+				() -> profissionalServicoService.associar(profissionalId, servicoId)
+		);
+
+		verify(profissionalServicoRepository, never()).save(any());
+	}
+
+	private static final Long BARBEARIA_ID = 10L;
+
+	private Barbearia novaBarbearia(Long id) {
+		Barbearia barbearia = new Barbearia("Barbearia " + id);
+		ReflectionTestUtils.setField(barbearia, "id", id);
+		return barbearia;
+	}
+
 	private Profissional novoProfissional() {
 		return new Profissional(
-				new Usuario("Marcelo", "marcelo@agendapro.com")
+				new Usuario("Marcelo", "marcelo@agendapro.com"),
+				novaBarbearia(BARBEARIA_ID)
 		);
 	}
 
 	private Servico novoServico() {
+		return novoServico(BARBEARIA_ID);
+	}
+
+	private Servico novoServico(Long barbeariaId) {
 		return new Servico(
 				"Corte de cabelo",
 				null,
 				30,
-				new BigDecimal("50.00")
+				new BigDecimal("50.00"),
+				novaBarbearia(barbeariaId)
 		);
 	}
 }

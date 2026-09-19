@@ -2,11 +2,16 @@ package com.agendapro.servico.entity;
 
 import java.math.BigDecimal;
 
+import com.agendapro.barbearia.entity.Barbearia;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
@@ -32,6 +37,10 @@ public class Servico {
 	@Column(nullable = false)
 	private boolean ativo = true;
 
+	@ManyToOne(fetch = FetchType.LAZY, optional = false)
+	@JoinColumn(name = "barbearia_id", nullable = false)
+	private Barbearia barbearia;
+
 	protected Servico() {
 	}
 
@@ -39,8 +48,10 @@ public class Servico {
 			String nome,
 			String descricao,
 			Integer duracaoMinutos,
-			BigDecimal preco
+			BigDecimal preco,
+			Barbearia barbearia
 	) {
+		this.barbearia = barbearia;
 		this.nome = nome;
 		this.descricao = descricao;
 		this.duracaoMinutos = duracaoMinutos;
@@ -69,6 +80,10 @@ public class Servico {
 
 	public boolean isAtivo() {
 		return ativo;
+	}
+
+	public Barbearia getBarbearia() {
+		return barbearia;
 	}
 
 	public void atualizarDados(
