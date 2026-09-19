@@ -31,23 +31,31 @@ END
 WHERE u.email LIKE '%@demo.agendapro.local'
   AND NOT EXISTS (SELECT 1 FROM profissionais p WHERE p.usuario_id = u.id);
 
--- O catalogo pertence a barbearia, entao cada uma das tres recebe os proprios
--- servicos. Os precos variam de propósito: e o que mostra que o catalogo nao e
--- mais global.
+-- O catalogo pertence a barbearia, entao cada uma recebe os proprios servicos.
+-- Os precos mudam de uma unidade para outra de proposito: e o que mostra na tela
+-- que o catalogo deixou de ser global. A barba e a referencia fixa das tres.
+--
+-- ON CONFLICT atualiza em vez de ignorar porque esta migration e repetivel:
+-- quando um preco muda aqui, o banco ja publicado precisa acompanhar na proxima
+-- execucao. O indice unico e por barbearia e nome normalizado.
 INSERT INTO servicos (barbearia_id, nome, descricao, duracao_minutos, preco, ativo)
 SELECT b.id, catalogo.nome, catalogo.descricao, catalogo.duracao, catalogo.preco, TRUE
 FROM barbearias b
-CROSS JOIN (VALUES
-    ('Corte de cabelo Social', 'Corte clássico com acabamento social.', 30, 45.00),
-    ('Corte de cabelo Degradê', 'Corte com transição em degradê e acabamento.', 45, 55.00),
-    ('Barba', 'Modelagem e acabamento completo da barba.', 30, 30.00)
-) AS catalogo(nome, descricao, duracao, preco)
-WHERE b.nome IN ('Barbershopping Ipanema', 'Barbearia da Comunidade', 'Barbershop Morumbi')
-  AND NOT EXISTS (
-      SELECT 1 FROM servicos s
-      WHERE s.barbearia_id = b.id
-        AND LOWER(BTRIM(s.nome)) = LOWER(BTRIM(catalogo.nome))
-  );
+JOIN (VALUES
+    ('Barbershopping Ipanema', 'Corte de cabelo Social', 'Corte clássico com acabamento social.', 30, 50.00),
+    ('Barbershopping Ipanema', 'Corte de cabelo Degradê', 'Corte com transição em degradê e acabamento.', 45, 60.00),
+    ('Barbershopping Ipanema', 'Barba', 'Modelagem e acabamento completo da barba.', 30, 20.00),
+    ('Barbearia da Comunidade', 'Corte de cabelo Social', 'Corte clássico com acabamento social.', 30, 35.00),
+    ('Barbearia da Comunidade', 'Corte de cabelo Degradê', 'Corte com transição em degradê e acabamento.', 45, 42.00),
+    ('Barbearia da Comunidade', 'Barba', 'Modelagem e acabamento completo da barba.', 30, 20.00),
+    ('Barbershop Morumbi', 'Corte de cabelo Social', 'Corte clássico com acabamento social.', 30, 45.00),
+    ('Barbershop Morumbi', 'Corte de cabelo Degradê', 'Corte com transição em degradê e acabamento.', 45, 55.00),
+    ('Barbershop Morumbi', 'Barba', 'Modelagem e acabamento completo da barba.', 30, 20.00)
+) AS catalogo(barbearia, nome, descricao, duracao, preco) ON catalogo.barbearia = b.nome
+ON CONFLICT (barbearia_id, LOWER(BTRIM(nome))) DO UPDATE
+SET descricao = EXCLUDED.descricao,
+    duracao_minutos = EXCLUDED.duracao_minutos,
+    preco = EXCLUDED.preco;
 
 -- Cada profissional executa os servicos da propria barbearia.
 INSERT INTO profissionais_servicos (profissional_id, servico_id, ativo)

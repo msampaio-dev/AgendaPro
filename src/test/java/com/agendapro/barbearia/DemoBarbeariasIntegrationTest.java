@@ -3,6 +3,8 @@ package com.agendapro.barbearia;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.math.BigDecimal;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -53,6 +55,39 @@ class DemoBarbeariasIntegrationTest extends PostgresIntegrationTest {
 				WHERE email = 'joao.gabriel@demo.agendapro.local'
 				""", String.class);
 		assertTrue(new BCryptPasswordEncoder().matches("Demo123!", senhaHash));
+	}
+
+	@Test
+	void cadaBarbeariaDeveTerPrecoProprioComBarbaComoReferencia() {
+		// O catalogo deixou de ser global: se os tres precos de um mesmo servico
+		// voltarem a ser iguais, a demonstracao para de mostrar isso na tela.
+		assertEquals(new BigDecimal("50.00"), preco("Barbershopping Ipanema", "Corte de cabelo Social"));
+		assertEquals(new BigDecimal("35.00"), preco("Barbearia da Comunidade", "Corte de cabelo Social"));
+		assertEquals(new BigDecimal("45.00"), preco("Barbershop Morumbi", "Corte de cabelo Social"));
+
+		assertEquals(3L, contar("""
+				SELECT COUNT(*) FROM servicos s
+				JOIN barbearias b ON b.id = s.barbearia_id
+				WHERE s.nome = 'Barba' AND s.preco = 20.00
+				  AND b.nome IN (
+					'Barbershopping Ipanema',
+					'Barbearia da Comunidade',
+					'Barbershop Morumbi'
+				  )
+				"""));
+
+		assertEquals(0L, contar("""
+				SELECT COUNT(*) FROM servicos
+				WHERE nome LIKE 'Corte%' AND (preco < 35.00 OR preco > 60.00)
+				"""));
+	}
+
+	private BigDecimal preco(String barbearia, String servico) {
+		return jdbc.queryForObject("""
+				SELECT s.preco FROM servicos s
+				JOIN barbearias b ON b.id = s.barbearia_id
+				WHERE b.nome = ? AND s.nome = ?
+				""", BigDecimal.class, barbearia, servico);
 	}
 
 	private long profissionaisDa(String nome) {
