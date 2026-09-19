@@ -25,9 +25,11 @@ segurança, consistência transacional e evolução gradual para um produto comp
 - Cadastro e atualização de usuários
 - Autenticação com senha BCrypt e emissão de JWT
 - Perfis `CLIENTE`, `PROFISSIONAL` e `ADMIN`
-- Cadastro de profissionais e serviços
+- Cadastro de profissionais
 - Barbearias com proprietário, endereço, foto e horários de funcionamento
-- Administração da equipe e dos serviços pelo proprietário da unidade
+- Catálogo de serviços próprio de cada barbearia, com duração e preço
+- Administração da equipe pelo proprietário da unidade
+- Administração do catálogo pelo proprietário e pela equipe da unidade
 - Associação entre profissionais e serviços
 - Horários semanais de atendimento
 - Bloqueios e disponibilidades extras
@@ -63,6 +65,9 @@ Outras regras:
 - Cada profissional possui seu próprio `ZoneId`.
 - A agenda do profissional é limitada pelo funcionamento da barbearia, inclusive intervalos de almoço.
 - Cada barbearia ativa possui um proprietário profissional e cada profissional pode possuir uma unidade ativa.
+- Cada serviço pertence a uma barbearia, e o nome é único dentro dela: duas unidades podem oferecer "Barba" com durações e preços próprios.
+- O catálogo de uma unidade é administrado pelo proprietário e por qualquer profissional ativo da equipe, sem depender de um administrador da plataforma.
+- Criar uma barbearia transfere o profissional para ela, inclusive quando ele pertencia à equipe de outra unidade.
 - A propriedade deve ser transferida para outro membro ativo antes de desativar ou transferir o proprietário.
 - Agendamentos guardam a barbearia original para preservar corretamente o histórico após transferências.
 - Horários inexistentes ou ambíguos por mudança de fuso são rejeitados.
@@ -206,11 +211,14 @@ Cadastre um usuário ou faça login, copie o token retornado e utilize o botão
 | `PATCH` | `/api/v1/profissionais/{id}/barbearia` | Transferir profissional entre unidades |
 | `GET` | `/api/v1/barbearias` | Listar unidades ativas disponíveis ao cliente |
 | `POST` | `/api/v1/barbearias` | Profissional criar sua própria unidade |
-| `GET` | `/api/v1/barbearias/minhas` | Listar unidades administradas pelo profissional |
+| `GET` | `/api/v1/barbearias/minhas` | Listar as unidades que o profissional possui e aquela onde trabalha |
 | `PATCH` | `/api/v1/barbearias/{id}/proprietario` | Transferir propriedade a um membro da unidade |
 | `POST` | `/api/v1/barbearias/{id}/horarios` | Adicionar período de funcionamento |
 | `POST` | `/api/v1/barbearias/{id}/foto` | Enviar foto da unidade |
-| `POST` | `/api/v1/servicos` | Cadastrar serviço |
+| `GET` | `/api/v1/servicos` | Listar serviços, filtrando por `barbeariaId` e `apenasAtivos` |
+| `POST` | `/api/v1/servicos` | Cadastrar serviço na barbearia informada em `barbeariaId` |
+| `PUT` | `/api/v1/servicos/{id}` | Atualizar nome, descrição, duração e preço |
+| `DELETE` | `/api/v1/servicos/{id}` | Desativar serviço |
 | `POST` | `/api/v1/profissionais-servicos` | Associar profissional e serviço |
 | `GET` | `/api/v1/profissionais-servicos/por-servico` | Listar profissionais associados ao serviço |
 | `POST` | `/api/v1/horarios-atendimento` | Cadastrar horário semanal |
@@ -273,7 +281,7 @@ Execute toda a suíte:
 ```
 
 O projeto possui testes unitários, testes HTTP, validação do contexto, testes com
-PostgreSQL real e teste de concorrência. No fechamento desta versão, os 94 testes
+PostgreSQL real e teste de concorrência. No fechamento desta versão, os 158 testes
 passaram sem falhas.
 
 Todos os testes de integração utilizam Testcontainers e o perfil `test`. Cada
@@ -300,11 +308,11 @@ desenvolvimento é necessária.
 - Segredos são recebidos por variáveis de ambiente.
 - A aplicação Docker executa com usuário sem privilégios administrativos.
 
-## Próxima evolução
+## Frontend
 
-O backend está preparado para receber um frontend em JavaScript/React. O frontend
-poderá consumir os contratos documentados no Swagger para oferecer uma interface
-visual de barbearia, clínica ou consultório.
+A interface vive no repositório `AgendaPro-Web`, em React e TypeScript, e consome
+os contratos documentados no Swagger. Ela cobre o agendamento do cliente, a agenda
+e a disponibilidade do profissional, a gestão da barbearia e a área administrativa.
 
 ## Autor
 
