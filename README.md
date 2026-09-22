@@ -1,80 +1,53 @@
-# AgendaPro — Sistema de Agendamento de Serviços
+# AgendaPro API
 
-API REST para clínicas, barbearias, consultórios e profissionais autônomos
-administrarem serviços, horários, disponibilidade e reservas.
+[![Backend CI](https://github.com/msampaio-dev/AgendaPro/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/msampaio-dev/AgendaPro/actions/workflows/backend-ci.yml)
+[![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
+[![Spring Boot 3.5](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-O projeto foi construído como um monólito modular, com foco em regras de negócio,
-segurança, consistência transacional e evolução gradual para um produto completo.
+![AgendaPro — agendamento para barbearias](https://raw.githubusercontent.com/msampaio-dev/AgendaPro-Web/main/public/og-agendapro.png)
 
-## Tecnologias
+API de agendamento para barbearias, em Java 21 e Spring Boot. Cada unidade tem equipe, catálogo e horário de funcionamento próprios; o cliente escolhe onde e com quem quer ser atendido; e duas reservas para o mesmo horário, chegando no mesmo instante, nunca são aceitas juntas — garantia do banco, não só do código.
 
-- Java 21
-- Spring Boot 3.5
-- Maven Wrapper
-- Spring Web e Validation
-- Spring Data JPA e Hibernate
-- Spring Security e JWT
-- PostgreSQL e Flyway
-- JUnit 5, Mockito e Testcontainers
-- Swagger/OpenAPI
-- Docker e Docker Compose
-- GitHub Actions
+> **Experimente o produto:** [agenda-pro-web-agendapro2.vercel.app](https://agenda-pro-web-agendapro2.vercel.app/)
+> **Frontend:** [msampaio-dev/AgendaPro-Web](https://github.com/msampaio-dev/AgendaPro-Web)
 
-## Funcionalidades
+## O que torna este projeto interessante
 
-- Cadastro e atualização de usuários
-- Autenticação com senha BCrypt e emissão de JWT
-- Perfis `CLIENTE`, `PROFISSIONAL` e `ADMIN`
-- Cadastro de profissionais
-- Barbearias com proprietário, endereço, foto e horários de funcionamento
-- Catálogo de serviços próprio de cada barbearia, com duração e preço
-- Administração da equipe pelo proprietário da unidade
-- Administração do catálogo pelo proprietário e pela equipe da unidade
-- Associação entre profissionais e serviços
-- Horários semanais de atendimento
-- Bloqueios e disponibilidades extras
-- Cálculo de horários disponíveis
-- Criação, confirmação, cancelamento e conclusão de agendamentos
-- Histórico por profissional e por cliente
-- Filtros por período e status
-- Paginação e ordenação
-- Erros HTTP padronizados
-- API versionada em `/api/v1`
-- Bootstrap seguro e opcional do primeiro administrador
-- CORS configurável para o frontend
-- Documentação interativa com Swagger UI
+- **Reserva dupla impossível:** duas pessoas nunca ficam com o mesmo horário, nem quando clicam no mesmo instante — a aplicação verifica e o PostgreSQL garante.
+- **Disponibilidade calculada:** horários livres consideram jornada do profissional, funcionamento da unidade, almoço, bloqueios, horários extras e reservas existentes.
+- **Múltiplas barbearias:** profissionais, serviços, preços, equipe e histórico pertencem à unidade correta.
+- **Tempo modelado corretamente:** horários locais usam `LocalDate` e `LocalTime`; reservas são persistidas como `Instant`, respeitando o `ZoneId` do profissional.
+- **Autorização por contexto:** cliente, profissional, proprietário da barbearia e administrador possuem permissões diferentes.
+- **Banco versionado:** o Hibernate valida o schema, enquanto o Flyway controla todas as mudanças.
+- **Testes isolados:** integrações executam em PostgreSQL descartável com Testcontainers e nunca acessam o banco local.
 
-## Regras de negócio importantes
+## O produto
+
+O cliente escolhe a barbearia, o profissional e o serviço — com barba como adicional — e vê apenas horários livres. O profissional cuida da própria agenda, da jornada, do almoço e dos bloqueios. O proprietário administra a unidade, a equipe e o catálogo, com preços próprios. E o administrador acompanha a plataforma inteira.
+
+A lista completa de funcionalidades por perfil está no [README do frontend](https://github.com/msampaio-dev/AgendaPro-Web#experiência-por-perfil).
+
+## A regra mais importante
 
 Um profissional nunca pode possuir dois agendamentos que ocupem o mesmo intervalo.
-A regra é protegida em duas camadas:
 
-1. A aplicação verifica previamente a existência de sobreposição.
-2. O PostgreSQL utiliza uma constraint de exclusão sobre um `tstzrange`.
+```text
+Reserva existente:  14:00 ───────── 14:30
+Nova tentativa:            14:15 ───────── 14:45  → rejeitada
+Intervalo adjacente:                     14:30 ─── 15:00  → permitido
+```
 
-A proteção do banco evita reservas duplicadas mesmo quando duas requisições chegam
-praticamente ao mesmo tempo. Intervalos adjacentes continuam permitidos.
+A proteção acontece em duas camadas:
 
-Outras regras:
+1. o service verifica previamente se existe sobreposição;
+2. o PostgreSQL aplica uma exclusion constraint sobre `tstzrange`.
 
-- Somente profissionais e serviços ativos participam de novos agendamentos.
-- Um horário precisa pertencer à disponibilidade calculada.
-- Agendamentos no passado são rejeitados.
-- Um atendimento só pode ser concluído depois do horário final.
-- Horários são convertidos para `Instant` e armazenados como instante absoluto.
-- Cada profissional possui seu próprio `ZoneId`.
-- A agenda do profissional é limitada pelo funcionamento da barbearia, inclusive intervalos de almoço.
-- Cada barbearia ativa possui um proprietário profissional e cada profissional pode possuir uma unidade ativa.
-- Cada serviço pertence a uma barbearia, e o nome é único dentro dela: duas unidades podem oferecer "Barba" com durações e preços próprios.
-- O catálogo de uma unidade é administrado pelo proprietário e por qualquer profissional ativo da equipe, sem depender de um administrador da plataforma.
-- Criar uma barbearia transfere o profissional para ela, inclusive quando ele pertencia à equipe de outra unidade.
-- A propriedade deve ser transferida para outro membro ativo antes de desativar ou transferir o proprietário.
-- Agendamentos guardam a barbearia original para preservar corretamente o histórico após transferências.
-- Horários inexistentes ou ambíguos por mudança de fuso são rejeitados.
+Mesmo que duas requisições sejam processadas praticamente ao mesmo tempo, apenas uma consegue reservar o intervalo. Essa garantia é comprovada por teste de concorrência com PostgreSQL real.
 
 ## Arquitetura
 
-O código é organizado por funcionalidade:
+O AgendaPro é um **monólito modular organizado por funcionalidade**. Essa escolha mantém o deploy simples sem transformar o código em um pacote único e acoplado.
 
 ```text
 com.agendapro
@@ -90,38 +63,68 @@ com.agendapro
 └── shared
 ```
 
-Cada módulo contém apenas os pacotes necessários, como `controller`, `service`,
-`repository`, `entity`, `dto` e `exception`.
-
-Fluxo principal:
-
 ```text
-requisição HTTP → controller → service → repository → PostgreSQL
-                         ↓
-                    regras de negócio
+HTTP/JSON
+   │
+   ▼
+Controller ── DTOs + validação
+   │
+   ▼
+Service ───── regras de negócio + transações
+   │
+   ▼
+Repository ── Spring Data JPA
+   │
+   ▼
+PostgreSQL ── constraints + integridade + concorrência
 ```
 
-Os controllers recebem e devolvem DTOs. As regras ficam nos services ou nas
-entidades quando pertencem diretamente ao ciclo de vida do domínio.
+Os controllers lidam com o contrato HTTP. Os services coordenam casos de uso e transações. As entidades protegem seu próprio ciclo de vida. Os repositories isolam a persistência.
+
+## Decisões técnicas
+
+| Decisão | Por quê |
+|---|---|
+| Monólito modular | Um único deploy, com cada funcionalidade no seu pacote. Dividir em microsserviços só compensaria com várias equipes ou partes que precisem escalar separadas. |
+| DTOs na entrada e na saída | A API conversa com o cliente por contratos próprios. Mudar uma tabela não quebra quem consome. |
+| `ddl-auto=validate` | O Hibernate só confere o banco, nunca altera. O schema muda apenas por migration. |
+| Flyway | Todo ambiente chega ao mesmo banco pelo mesmo caminho, e cada mudança fica versionada como código. |
+| JWT stateless | O servidor não guarda sessão: o frontend envia o token a cada requisição, sem depender de cookie. |
+| BCrypt | É lento de propósito. Mesmo que o banco vaze, descobrir as senhas por tentativa fica caro demais. |
+| `Instant` no banco | Guarda o momento exato, sem ambiguidade de fuso. O horário local é calculado com o fuso de cada profissional. |
+| Constraint de exclusão | O próprio PostgreSQL recusa dois horários sobrepostos, mesmo que a aplicação falhe. |
+| Testcontainers | A regra mais importante depende de recursos exclusivos do PostgreSQL. Testar num banco em memória não provaria que ela funciona. |
+| Desativação lógica | Registros são desativados, não apagados: o histórico de agendamentos continua íntegro. |
+
+## Stack
+
+- Java 21
+- Spring Boot 3.5
+- Spring Web, Validation e Data JPA
+- Spring Security e JWT
+- PostgreSQL e Flyway
+- JUnit 5, Mockito e Testcontainers
+- Swagger/OpenAPI
+- Maven Wrapper
+- Docker e Docker Compose
+- GitHub Actions
 
 ## Executando localmente
 
-Pré-requisitos:
+### Pré-requisitos
 
-- JDK 21
-- PostgreSQL
-- Docker Desktop para os testes com Testcontainers
+- JDK 21;
+- PostgreSQL;
+- Docker Desktop para os testes de integração.
 
-Sem perfil explícito, a aplicação utiliza `dev`, com PostgreSQL em
-`localhost:5432`. O perfil `test` é ativado pelos testes e sempre usa
-Testcontainers. O perfil `prod` exige banco, JWT e origens CORS definidos por
-variáveis de ambiente, sem valores locais como fallback.
+Crie o banco `agendapro` e o usuário `agendapro_user`. Depois configure:
 
-Crie o banco `agendapro` e o usuário `agendapro_user`. Depois defina as variáveis
-de ambiente `DB_PASSWORD` e `JWT_SECRET`.
+| Variável | Uso |
+|---|---|
+| `DB_PASSWORD` | Senha do PostgreSQL local |
+| `JWT_SECRET` | Chave Base64 com pelo menos 32 bytes |
 
-O segredo JWT precisa estar em Base64 e representar pelo menos 32 bytes. No
-PowerShell, uma chave de desenvolvimento pode ser gerada assim:
+Uma chave de desenvolvimento pode ser gerada no PowerShell:
 
 ```powershell
 $bytes = New-Object byte[] 32
@@ -129,192 +132,126 @@ $bytes = New-Object byte[] 32
 [Convert]::ToBase64String($bytes)
 ```
 
-Execute a aplicação:
+Inicie a API:
 
 ```powershell
 .\mvnw.cmd spring-boot:run
 ```
 
-### Criando o primeiro administrador
+O perfil padrão é `dev`, com PostgreSQL em `localhost:5432`. A API estará em `http://localhost:8080/api/v1`.
 
-Não existe endpoint público para promover usuários a `ADMIN`. Para criar o
-primeiro administrador, defina temporariamente estas variáveis antes de iniciar a
-aplicação:
-
-```powershell
-$env:BOOTSTRAP_ADMIN_ENABLED="true"
-$env:BOOTSTRAP_ADMIN_NAME="Administrador"
-$env:BOOTSTRAP_ADMIN_EMAIL="admin@agendapro.com"
-$env:BOOTSTRAP_ADMIN_PASSWORD="troque-por-uma-senha-forte"
-.\mvnw.cmd spring-boot:run
-```
-
-O bootstrap só cria o usuário quando ainda não existe nenhum `ADMIN`. A senha é
-validada e armazenada com BCrypt. Se o e-mail já pertencer a outro usuário, a
-aplicação falha sem promover essa conta silenciosamente.
-
-Depois da primeira inicialização bem-sucedida, pare a aplicação, desative
-`BOOTSTRAP_ADMIN_ENABLED` e remova nome, e-mail e senha das variáveis de ambiente.
-
-## Executando com Docker
-
-Crie seu arquivo local de variáveis a partir do exemplo:
+### Docker Compose
 
 ```powershell
 Copy-Item .env.example .env
-```
-
-Substitua os valores de `DB_PASSWORD` e `JWT_SECRET` no `.env`. Esse arquivo está
-no `.gitignore` e não deve ser enviado ao GitHub.
-
-Suba a API e o PostgreSQL:
-
-```powershell
 docker compose up --build
 ```
 
-O Compose ativa o perfil `prod`. Para uma implantação real, defina
-`SWAGGER_ENABLED=false`; no ambiente Docker local ele permanece habilitado para
-facilitar os testes manuais.
+Preencha `DB_PASSWORD` e `JWT_SECRET` no `.env`. O arquivo é ignorado pelo Git e não deve ser versionado.
 
-Para encerrar:
+Para encerrar sem apagar os dados:
 
 ```powershell
 docker compose down
 ```
 
-O volume `postgres_data` mantém os dados entre reinicializações. Use
-`docker compose down --volumes` somente quando quiser apagar o banco do ambiente
-Docker.
-
 ## Documentação da API
 
-Com a aplicação iniciada:
+Com o projeto local em execução:
 
-- Swagger UI: `http://localhost:8080/swagger-ui.html`
-- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
-- URL base da API: `http://localhost:8080/api/v1`
-- Health check: `http://localhost:8080/actuator/health`
+- Swagger UI: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+- OpenAPI JSON: [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
+- Health check: [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
 
-Cadastre um usuário ou faça login, copie o token retornado e utilize o botão
-**Authorize** do Swagger com o JWT.
+Principais grupos de endpoints:
 
-## Endpoints principais
+| Recurso | Exemplos |
+|---|---|
+| Autenticação | `POST /auth/login`, `GET /auth/me` |
+| Usuários | cadastro, atualização, desativação e reativação |
+| Barbearias | gestão da unidade, proprietário, equipe, foto e funcionamento |
+| Serviços | catálogo por barbearia e associação com profissionais |
+| Disponibilidade | jornada, almoço, bloqueios, horários extras e consulta de vagas |
+| Agendamentos | criação, filtros, confirmação, cancelamento e conclusão |
 
-| Método | Endpoint | Finalidade |
-|---|---|---|
-| `POST` | `/api/v1/usuarios` | Cadastrar usuário |
-| `POST` | `/api/v1/auth/login` | Autenticar e gerar JWT |
-| `GET` | `/api/v1/auth/me` | Consultar a sessão autenticada |
-| `GET` | `/api/v1/usuarios/{id}` | Consultar usuário |
-| `POST` | `/api/v1/profissionais` | Criar perfil profissional |
-| `PATCH` | `/api/v1/profissionais/{id}/barbearia` | Transferir profissional entre unidades |
-| `GET` | `/api/v1/barbearias` | Listar unidades ativas disponíveis ao cliente |
-| `POST` | `/api/v1/barbearias` | Profissional criar sua própria unidade |
-| `GET` | `/api/v1/barbearias/minhas` | Listar as unidades que o profissional possui e aquela onde trabalha |
-| `PATCH` | `/api/v1/barbearias/{id}/proprietario` | Transferir propriedade a um membro da unidade |
-| `POST` | `/api/v1/barbearias/{id}/horarios` | Adicionar período de funcionamento |
-| `POST` | `/api/v1/barbearias/{id}/foto` | Enviar foto da unidade |
-| `GET` | `/api/v1/servicos` | Listar serviços, filtrando por `barbeariaId` e `apenasAtivos` |
-| `POST` | `/api/v1/servicos` | Cadastrar serviço na barbearia informada em `barbeariaId` |
-| `PUT` | `/api/v1/servicos/{id}` | Atualizar nome, descrição, duração e preço |
-| `DELETE` | `/api/v1/servicos/{id}` | Desativar serviço |
-| `POST` | `/api/v1/profissionais-servicos` | Associar profissional e serviço |
-| `GET` | `/api/v1/profissionais-servicos/por-servico` | Listar profissionais associados ao serviço |
-| `POST` | `/api/v1/horarios-atendimento` | Cadastrar horário semanal |
-| `POST` | `/api/v1/excecoes-disponibilidade` | Criar bloqueio ou horário extra |
-| `GET` | `/api/v1/disponibilidades` | Consultar horários disponíveis |
-| `POST` | `/api/v1/agendamentos` | Criar agendamento |
-| `GET` | `/api/v1/agendamentos` | Histórico paginado do profissional |
-| `GET` | `/api/v1/agendamentos/cliente/{id}` | Histórico paginado do cliente |
-| `PATCH` | `/api/v1/agendamentos/{id}/confirmar` | Confirmar agendamento |
-| `PATCH` | `/api/v1/agendamentos/{id}/cancelar` | Cancelar agendamento |
-| `PATCH` | `/api/v1/agendamentos/{id}/concluir` | Concluir atendimento |
+Todos os endpoints da aplicação utilizam o prefixo `/api/v1`.
 
-A documentação OpenAPI contém todos os parâmetros e contratos disponíveis.
-
-### Filtros e paginação
-
-Exemplo da agenda de um profissional:
-
-```text
-GET /api/v1/agendamentos?profissionalId=1&dataInicio=2030-01-01&dataFim=2030-01-31&status=CONFIRMADO&page=0&size=20&sort=inicio,desc
-```
-
-O tamanho máximo é de 100 registros. A ordenação aceita `id`, `inicio`, `fim` e
-`status`.
-
-## Integração com o frontend
-
-Por padrão, o navegador permite chamadas originadas de
-`http://localhost:5173`, porta padrão do Vite. Para autorizar outras origens,
-configure uma lista separada por vírgulas:
-
-```text
-CORS_ALLOWED_ORIGINS=http://localhost:5173,https://app.exemplo.com
-```
-
-São aceitos apenas os métodos e cabeçalhos necessários à API. Como o JWT é enviado
-no cabeçalho `Authorization`, credenciais baseadas em cookies permanecem
-desabilitadas no CORS.
-
-## Banco de dados e migrations
-
-O Hibernate está configurado com `ddl-auto=validate`: ele confere se as entidades
-correspondem ao banco, mas não cria ou altera tabelas.
-
-O schema é controlado exclusivamente por migrations Flyway em:
-
-```text
-src/main/resources/db/migration
-```
-
-Nunca altere uma migration que já foi executada em um ambiente compartilhado.
-Crie uma nova versão para cada mudança de schema.
-
-## Testes
-
-Execute toda a suíte:
+## Testes e qualidade
 
 ```powershell
-.\mvnw.cmd test
+.\mvnw.cmd verify
 ```
 
-O projeto possui testes unitários, testes HTTP, validação do contexto, testes com
-PostgreSQL real e teste de concorrência. No fechamento desta versão, os 158 testes
-passaram sem falhas.
+Na última verificação local, **164 testes** passaram sem falhas. A suíte inclui:
 
-Todos os testes de integração utilizam Testcontainers e o perfil `test`. Cada
-contexto recebe um PostgreSQL descartável, sem acessar o banco local de
-desenvolvimento. Os testes unitários permanecem isolados com Mockito e não iniciam
-o banco.
+- testes unitários de services e entidades;
+- Mockito para colaboradores isolados;
+- testes HTTP de autenticação, validação, CORS e autorização;
+- migrations Flyway aplicadas do zero;
+- PostgreSQL real com Testcontainers;
+- teste de concorrência para reservas simultâneas;
+- persistência e validação de imagens;
+- bootstrap seguro do primeiro administrador.
 
-O teste de concorrência comprova também que somente uma de duas reservas
-simultâneas para o mesmo horário é aceita.
-
-## Integração contínua
-
-O workflow `.github/workflows/backend-ci.yml` executa `mvn verify` com Java 21 em
-todo push e pull request para `main`. O Docker disponível no runner é usado pelos
-testes de integração com Testcontainers; nenhuma credencial do banco de
-desenvolvimento é necessária.
+O GitHub Actions executa `mvn verify` com Java 21 em todo push e pull request para `main`.
 
 ## Segurança
 
-- Senhas nunca são armazenadas em texto puro.
-- O login devolve uma mensagem genérica para credenciais incorretas.
-- JWTs possuem emissor, expiração e identificador único.
-- Endpoints verificam perfil e propriedade do recurso.
-- Segredos são recebidos por variáveis de ambiente.
-- A aplicação Docker executa com usuário sem privilégios administrativos.
+- senhas armazenadas exclusivamente com BCrypt;
+- JWT assinado, com emissor e expiração validados;
+- autorização por perfil, proprietário e titular do recurso;
+- mensagens de login que não revelam se um e-mail existe;
+- CORS restrito às origens configuradas;
+- segredos fornecidos por variáveis de ambiente;
+- bootstrap administrativo opcional e de uso único;
+- upload limitado a JPEG/PNG, com tamanho e conteúdo validados;
+- container executado com usuário sem privilégios administrativos.
 
-## Frontend
+### Primeiro administrador
 
-A interface vive no repositório `AgendaPro-Web`, em React e TypeScript, e consome
-os contratos documentados no Swagger. Ela cobre o agendamento do cliente, a agenda
-e a disponibilidade do profissional, a gestão da barbearia e a área administrativa.
+Não existe endpoint público para transformar uma conta em `ADMIN`. O primeiro administrador é criado por bootstrap controlado por ambiente:
+
+```powershell
+$env:BOOTSTRAP_ADMIN_ENABLED="true"
+$env:BOOTSTRAP_ADMIN_NAME="Administrador"
+$env:BOOTSTRAP_ADMIN_EMAIL="admin@agendapro.com"
+$env:BOOTSTRAP_ADMIN_PASSWORD="defina-uma-senha-forte"
+.\mvnw.cmd spring-boot:run
+```
+
+Depois da criação, desative `BOOTSTRAP_ADMIN_ENABLED` e remova as variáveis sensíveis.
+
+## Banco e migrations
+
+As migrations ficam em `src/main/resources/db/migration`. O Hibernate está configurado com `ddl-auto=validate`: ele verifica a compatibilidade das entidades, mas não cria nem modifica tabelas.
+
+Uma migration já aplicada não deve ser editada. Toda evolução de schema recebe uma nova versão, preservando ambientes existentes e o histórico do banco.
+
+## Demonstração online
+
+O frontend está publicado na Vercel e a API em infraestrutura gratuita. Quando o backend está hibernando, a primeira requisição pode levar até cerca de um minuto enquanto o serviço sobe — a tela de login avisa que isso está acontecendo.
+
+A conta demonstrativa exibida na tela de login permite explorar também os fluxos do profissional. Os dados desse ambiente são fictícios e compartilhados; credenciais administrativas não são publicadas.
+
+**Acesse:** [https://agenda-pro-web-agendapro2.vercel.app](https://agenda-pro-web-agendapro2.vercel.app/)
+
+## Limitações conhecidas
+
+Decisões tomadas com consciência do custo, registradas aqui para quem avalia o projeto:
+
+- **Arranque a frio de até um minuto.** O plano gratuito hiberna o serviço após cerca de quinze minutos sem tráfego. A aplicação aquece o caminho crítico assim que sobe, e o frontend avisa quem espera em vez de parecer travado, mas o tempo de despertar só desaparece em plano pago.
+- **Imagens no banco, não em object storage.** O disco do plano gratuito é efêmero e apagava as fotos a cada implantação. Guardá-las em `BYTEA` resolveu com a infraestrutura que já existia; em outro volume, a escolha correta seria S3 ou equivalente. A troca está contida em `ArmazenamentoImagemService`.
+- **Fotos gravadas no tamanho original.** Ainda não há redimensionamento no upload, então uma capa pode ocupar alguns megabytes.
+- **Observabilidade mínima.** Existe health check, mas não há métricas nem rastreamento distribuído.
+- **Ambiente demonstrativo compartilhado.** Os dados são fictícios e qualquer visitante pode alterá-los.
 
 ## Autor
 
-Projeto desenvolvido por Marcelo como estudo prático de backend profissional com
-Java e Spring Boot.
+Desenvolvido por **Marcelo Sampaio** como projeto de portfólio e estudo prático de engenharia de software com Java, Spring Boot, PostgreSQL e React.
+
+- GitHub: [@msampaio-dev](https://github.com/msampaio-dev)
+- Frontend: [AgendaPro-Web](https://github.com/msampaio-dev/AgendaPro-Web)
+
+---
+
+Se você chegou até aqui, obrigado pelo tempo. O raciocínio por trás de cada decisão está nas mensagens de commit: o `git log` conta a história do projeto, inclusive os erros e como foram corrigidos.
