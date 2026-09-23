@@ -5,7 +5,7 @@
 [![Spring Boot 3.5](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-![AgendaPro — agendamento para barbearias](https://raw.githubusercontent.com/msampaio-dev/AgendaPro-Web/main/public/og-agendapro.png)
+![Demonstração do agendamento: escolha da barbearia, do profissional, do serviço com barba e do horário, até a confirmação](docs/screenshots/agendamento.gif)
 
 API de agendamento para barbearias, em Java 21 e Spring Boot. Cada unidade tem equipe, catálogo e horário de funcionamento próprios; o cliente escolhe onde e com quem quer ser atendido; e duas reservas para o mesmo horário, chegando no mesmo instante, nunca são aceitas juntas — garantia do banco, não só do código.
 
@@ -26,7 +26,7 @@ API de agendamento para barbearias, em Java 21 e Spring Boot. Cada unidade tem e
 
 O cliente escolhe a barbearia, o profissional e o serviço — com barba como adicional — e vê apenas horários livres. O profissional cuida da própria agenda, da jornada, do almoço e dos bloqueios. O proprietário administra a unidade, a equipe e o catálogo, com preços próprios. E o administrador acompanha a plataforma inteira.
 
-A lista completa de funcionalidades por perfil está no [README do frontend](https://github.com/msampaio-dev/AgendaPro-Web#experiência-por-perfil).
+A lista completa de funcionalidades e as telas de cada perfil estão no [README do frontend](https://github.com/msampaio-dev/AgendaPro-Web#experiência-por-perfil).
 
 ## A regra mais importante
 
