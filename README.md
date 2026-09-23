@@ -7,30 +7,29 @@
 
 ![Demonstração do agendamento: escolha da barbearia, do profissional, do serviço com barba e do horário, até a confirmação](docs/screenshots/agendamento.gif)
 
-API de agendamento para barbearias, em Java 21 e Spring Boot. Cada unidade tem equipe, catálogo e horário de funcionamento próprios; o cliente escolhe onde e com quem quer ser atendido; e duas reservas para o mesmo horário, chegando no mesmo instante, nunca são aceitas juntas — garantia do banco, não só do código.
+API de agendamento para barbearias, em Java 21 e Spring Boot. Cada barbearia tem equipe, catálogo e horário de funcionamento próprios, e o cliente escolhe onde e com quem quer ser atendido. Duas reservas para o mesmo horário nunca são aceitas juntas, nem quando chegam no mesmo instante, porque o próprio banco recusa a segunda.
 
-> **Experimente o produto:** [agenda-pro-web-agendapro2.vercel.app](https://agenda-pro-web-agendapro2.vercel.app/)
-> **Frontend:** [msampaio-dev/AgendaPro-Web](https://github.com/msampaio-dev/AgendaPro-Web)
+> Teste o produto em [agenda-pro-web-agendapro2.vercel.app](https://agenda-pro-web-agendapro2.vercel.app/). O código do frontend está em [msampaio-dev/AgendaPro-Web](https://github.com/msampaio-dev/AgendaPro-Web).
 
-## O que torna este projeto interessante
+## Destaques
 
-- **Reserva dupla impossível:** duas pessoas nunca ficam com o mesmo horário, nem quando clicam no mesmo instante — a aplicação verifica e o PostgreSQL garante.
-- **Disponibilidade calculada:** horários livres consideram jornada do profissional, funcionamento da unidade, almoço, bloqueios, horários extras e reservas existentes.
-- **Múltiplas barbearias:** profissionais, serviços, preços, equipe e histórico pertencem à unidade correta.
-- **Tempo modelado corretamente:** horários locais usam `LocalDate` e `LocalTime`; reservas são persistidas como `Instant`, respeitando o `ZoneId` do profissional.
-- **Autorização por contexto:** cliente, profissional, proprietário da barbearia e administrador possuem permissões diferentes.
-- **Banco versionado:** o Hibernate valida o schema, enquanto o Flyway controla todas as mudanças.
-- **Testes isolados:** integrações executam em PostgreSQL descartável com Testcontainers e nunca acessam o banco local.
+- Nenhum horário é reservado duas vezes, mesmo quando duas pessoas clicam no mesmo instante. A aplicação verifica antes, e o PostgreSQL recusa a sobreposição se as duas reservas passarem juntas.
+- Os horários livres levam em conta a jornada do profissional, o funcionamento da unidade, o almoço, os bloqueios, os horários extras e as reservas que já existem.
+- Cada barbearia tem os próprios profissionais, serviços, preços, equipe e histórico.
+- Os horários locais usam `LocalDate` e `LocalTime`, e as reservas são gravadas como `Instant`, com o `ZoneId` de cada profissional.
+- Cliente, profissional, proprietário da barbearia e administrador têm permissões diferentes.
+- O Hibernate só valida o schema. Toda mudança no banco passa pelo Flyway.
+- Os testes de integração rodam num PostgreSQL descartável, com Testcontainers, e nunca tocam o banco local.
 
 ## O produto
 
-O cliente escolhe a barbearia, o profissional e o serviço — com barba como adicional — e vê apenas horários livres. O profissional cuida da própria agenda, da jornada, do almoço e dos bloqueios. O proprietário administra a unidade, a equipe e o catálogo, com preços próprios. E o administrador acompanha a plataforma inteira.
+O cliente escolhe a barbearia, o profissional e o serviço (com barba como adicional) e vê apenas horários livres. O profissional cuida da própria agenda, da jornada, do almoço e dos bloqueios. Já o proprietário administra a unidade, a equipe e o catálogo, com preços próprios, e o administrador acompanha a plataforma inteira.
 
 A lista completa de funcionalidades e as telas de cada perfil estão no [README do frontend](https://github.com/msampaio-dev/AgendaPro-Web#experiência-por-perfil).
 
 ## A regra mais importante
 
-Um profissional nunca pode possuir dois agendamentos que ocupem o mesmo intervalo.
+Um profissional nunca pode ter dois agendamentos que ocupem o mesmo intervalo.
 
 ```text
 Reserva existente:  14:00 ───────── 14:30
@@ -43,11 +42,11 @@ A proteção acontece em duas camadas:
 1. o service verifica previamente se existe sobreposição;
 2. o PostgreSQL aplica uma exclusion constraint sobre `tstzrange`.
 
-Mesmo que duas requisições sejam processadas praticamente ao mesmo tempo, apenas uma consegue reservar o intervalo. Essa garantia é comprovada por teste de concorrência com PostgreSQL real.
+Um teste de concorrência com PostgreSQL real dispara duas requisições praticamente ao mesmo tempo e confirma que só uma consegue reservar o intervalo.
 
 ## Arquitetura
 
-O AgendaPro é um **monólito modular organizado por funcionalidade**. Essa escolha mantém o deploy simples sem transformar o código em um pacote único e acoplado.
+O AgendaPro é um monólito modular, organizado por funcionalidade.
 
 ```text
 com.agendapro
@@ -79,7 +78,7 @@ Repository ── Spring Data JPA
 PostgreSQL ── constraints + integridade + concorrência
 ```
 
-Os controllers lidam com o contrato HTTP. Os services coordenam casos de uso e transações. As entidades protegem seu próprio ciclo de vida. Os repositories isolam a persistência.
+Os controllers cuidam do contrato HTTP, os services coordenam casos de uso e transações, as entidades protegem o próprio ciclo de vida e os repositories isolam a persistência.
 
 ## Decisões técnicas
 
@@ -124,7 +123,7 @@ Crie o banco `agendapro` e o usuário `agendapro_user`. Depois configure:
 | `DB_PASSWORD` | Senha do PostgreSQL local |
 | `JWT_SECRET` | Chave Base64 com pelo menos 32 bytes |
 
-Uma chave de desenvolvimento pode ser gerada no PowerShell:
+Para gerar uma chave de desenvolvimento no PowerShell:
 
 ```powershell
 $bytes = New-Object byte[] 32
@@ -174,7 +173,7 @@ Principais grupos de endpoints:
 | Disponibilidade | jornada, almoço, bloqueios, horários extras e consulta de vagas |
 | Agendamentos | criação, filtros, confirmação, cancelamento e conclusão |
 
-Todos os endpoints da aplicação utilizam o prefixo `/api/v1`.
+Todos os endpoints usam o prefixo `/api/v1`.
 
 ## Testes e qualidade
 
@@ -182,7 +181,7 @@ Todos os endpoints da aplicação utilizam o prefixo `/api/v1`.
 .\mvnw.cmd verify
 ```
 
-Na última verificação local, **164 testes** passaram sem falhas. A suíte inclui:
+Na última verificação local, os 164 testes passaram. A suíte inclui:
 
 - testes unitários de services e entidades;
 - Mockito para colaboradores isolados;
@@ -229,25 +228,23 @@ Uma migration já aplicada não deve ser editada. Toda evolução de schema rece
 
 ## Demonstração online
 
-O frontend está publicado na Vercel e a API em infraestrutura gratuita. Quando o backend está hibernando, a primeira requisição pode levar até cerca de um minuto enquanto o serviço sobe — a tela de login avisa que isso está acontecendo.
+O frontend está publicado na Vercel e a API em infraestrutura gratuita. Quando o backend está hibernando, a primeira requisição pode levar até cerca de um minuto enquanto o serviço sobe, e a tela de login avisa que isso está acontecendo.
 
 A conta demonstrativa exibida na tela de login permite explorar também os fluxos do profissional. Os dados desse ambiente são fictícios e compartilhados; credenciais administrativas não são publicadas.
 
-**Acesse:** [https://agenda-pro-web-agendapro2.vercel.app](https://agenda-pro-web-agendapro2.vercel.app/)
+A demonstração está em [https://agenda-pro-web-agendapro2.vercel.app](https://agenda-pro-web-agendapro2.vercel.app/).
 
 ## Limitações conhecidas
 
-Decisões tomadas com consciência do custo, registradas aqui para quem avalia o projeto:
-
-- **Arranque a frio de até um minuto.** O plano gratuito hiberna o serviço após cerca de quinze minutos sem tráfego. A aplicação aquece o caminho crítico assim que sobe, e o frontend avisa quem espera em vez de parecer travado, mas o tempo de despertar só desaparece em plano pago.
-- **Imagens no banco, não em object storage.** O disco do plano gratuito é efêmero e apagava as fotos a cada implantação. Guardá-las em `BYTEA` resolveu com a infraestrutura que já existia; em outro volume, a escolha correta seria S3 ou equivalente. A troca está contida em `ArmazenamentoImagemService`.
-- **Fotos gravadas no tamanho original.** Ainda não há redimensionamento no upload, então uma capa pode ocupar alguns megabytes.
-- **Observabilidade mínima.** Existe health check, mas não há métricas nem rastreamento distribuído.
-- **Ambiente demonstrativo compartilhado.** Os dados são fictícios e qualquer visitante pode alterá-los.
+- O plano gratuito hiberna o serviço depois de cerca de quinze minutos sem tráfego, e acordar leva até um minuto. A aplicação aquece o caminho crítico assim que sobe e o frontend avisa quem está esperando, mas esse tempo só some num plano pago.
+- As imagens ficam no banco, em `BYTEA`, e não num object storage. O disco do plano gratuito é efêmero e apagava as fotos a cada implantação, e guardá-las no banco resolveu com a infraestrutura que já existia. Com mais volume, o certo seria S3 ou equivalente; a troca fica contida em `ArmazenamentoImagemService`.
+- As fotos são gravadas no tamanho original, sem redimensionamento no upload, então uma capa pode ocupar alguns megabytes.
+- A observabilidade é mínima: há health check, mas não há métricas nem rastreamento distribuído.
+- O ambiente de demonstração é compartilhado. Os dados são fictícios e qualquer visitante pode alterá-los.
 
 ## Autor
 
-Desenvolvido por **Marcelo Sampaio** como projeto de portfólio e estudo prático de engenharia de software com Java, Spring Boot, PostgreSQL e React.
+Desenvolvido por Marcelo Sampaio como projeto de portfólio e estudo prático de engenharia de software com Java, Spring Boot, PostgreSQL e React.
 
 - GitHub: [@msampaio-dev](https://github.com/msampaio-dev)
 - Frontend: [AgendaPro-Web](https://github.com/msampaio-dev/AgendaPro-Web)
