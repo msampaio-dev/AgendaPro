@@ -217,6 +217,20 @@ class ClaudeInterpretadorPedidoTest {
 	}
 
 	@Test
+	void naoDeveChamarAIaQuandoOCatalogoPassaDoTetoDeTamanho() {
+		List<CatalogoSugestao.Servico> muitos = java.util.stream.LongStream.rangeClosed(1, 400)
+				.mapToObj(id -> new CatalogoSugestao.Servico(id, "Servico inflado " + "x".repeat(100), 30))
+				.toList();
+		CatalogoSugestao inflado = new CatalogoSugestao(LocalDate.of(2026, 10, 7), List.of(
+				new CatalogoSugestao.Barbearia(1L, "Unidade", List.of(), muitos)));
+
+		SugestaoIndisponivelException erro = assertThrows(SugestaoIndisponivelException.class,
+				() -> interpretador().interpretar("corte amanha", inflado));
+		assertFalse(erro.podeTerSidoCobrada());
+		assertTrue(corposRecebidos.isEmpty(), "a IA nao pode ser chamada com o prompt inflado");
+	}
+
+	@Test
 	void deveFicarIndisponivelSemChaveSemFazerRequisicao() {
 		ClaudeInterpretadorPedido semChave = new ClaudeInterpretadorPedido(
 				"", "claude-haiku-5-5", urlServidor());

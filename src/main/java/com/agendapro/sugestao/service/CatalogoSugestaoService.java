@@ -1,6 +1,7 @@
 package com.agendapro.sugestao.service;
 
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -11,6 +12,7 @@ import com.agendapro.barbearia.repository.BarbeariaRepository;
 import com.agendapro.profissional.entity.Profissional;
 import com.agendapro.profissional.repository.ProfissionalRepository;
 import com.agendapro.profissionalservico.repository.ProfissionalServicoRepository;
+import com.agendapro.servico.entity.Servico;
 import com.agendapro.servico.repository.ServicoRepository;
 import com.agendapro.sugestao.ia.CatalogoSugestao;
 
@@ -26,6 +28,14 @@ import com.agendapro.sugestao.ia.CatalogoSugestao;
  */
 @Service
 public class CatalogoSugestaoService {
+
+	/**
+	 * Teto por barbearia. Quem administra uma unidade cria servicos a vontade (a
+	 * conta de demonstracao e publica e e de profissional), e cada servico vira
+	 * texto pago em toda chamada a IA. Ficam os mais antigos, para que servicos
+	 * criados em massa nao tirem do prompt os que ja existiam.
+	 */
+	static final int MAXIMO_POR_BARBEARIA = 30;
 
 	private final BarbeariaRepository barbeariaRepository;
 	private final ProfissionalRepository profissionalRepository;
@@ -58,6 +68,8 @@ public class CatalogoSugestaoService {
 		List<CatalogoSugestao.Servico> servicos = servicoRepository
 				.findAllByBarbeariaIdAndAtivoTrueOrderByNomeAsc(barbearia.getId())
 				.stream()
+				.sorted(Comparator.comparing(Servico::getId))
+				.limit(MAXIMO_POR_BARBEARIA)
 				.map(servico -> new CatalogoSugestao.Servico(
 						servico.getId(), servico.getNome(), servico.getDuracaoMinutos()))
 				.toList();
@@ -66,6 +78,8 @@ public class CatalogoSugestaoService {
 				.findAllByBarbeariaId(barbearia.getId())
 				.stream()
 				.filter(profissional -> profissional.isAtivo() && profissional.getUsuario().isAtivo())
+				.sorted(Comparator.comparing(Profissional::getId))
+				.limit(MAXIMO_POR_BARBEARIA)
 				.map(this::profissional)
 				.toList();
 
