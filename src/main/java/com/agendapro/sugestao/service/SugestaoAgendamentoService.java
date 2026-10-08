@@ -73,10 +73,13 @@ public class SugestaoAgendamentoService {
 		try {
 			pedido = interpretador.interpretar(texto, catalogo);
 		} catch (SugestaoIndisponivelException exception) {
-			// A IA nao respondeu: o cliente nao recebeu nada e o uso volta. Quando
-			// ela responde algo invalido (422) o uso fica contado, porque a
-			// chamada aconteceu e foi paga.
-			limiteUso.devolverUso(usuarioId, uso.dia());
+			// O uso so volta quando e certo que nada foi cobrado. Um timeout pode
+			// ter sido processado e pago; devolver esse uso deixaria o teto diario
+			// sem efeito enquanto a API estiver lenta. Resposta invalida (422)
+			// tambem continua contando, porque a chamada aconteceu.
+			if (!exception.podeTerSidoCobrada()) {
+				limiteUso.devolverUso(usuarioId, uso.dia());
+			}
 			throw exception;
 		}
 

@@ -58,7 +58,8 @@ A decisão final é do cliente porque alguns erros do modelo parecem acertos par
 | O modelo cita um id que não existe ou mistura barbearias | 422, e a tela mostra a escolha manual |
 | A data vem inválida, no passado ou a mais de 60 dias | 422 |
 | O modelo recusa o pedido ou a resposta vem cortada | 422 |
-| A API do Claude cai ou demora mais de 8 s | 503, o uso volta para a cota e o fluxo manual continua funcionando |
+| A API do Claude recusa o pedido por sobrecarga ou erro interno | Uma nova tentativa; se falhar de novo, 503 e o uso volta para a cota, porque recusas não são cobradas |
+| A API do Claude demora mais de 8 s | 503 sem nova tentativa, e o uso continua contado, porque o pedido pode ter sido processado e cobrado |
 | O dia pedido não tem vaga no período | A sugestão traz a próxima data com vaga e avisa a troca |
 | Alguém tenta gastar a cota da demonstração | Limite de 5 sugestões por usuário e 30 no total por dia, contados no banco |
 | O texto tenta dar ordens ao modelo | O texto vai delimitado como dado, e só ids do catálogo passam pela validação |
@@ -206,7 +207,7 @@ Todos os endpoints usam o prefixo `/api/v1`.
 .\mvnw.cmd verify
 ```
 
-Na última verificação local, os 203 testes passaram. A suíte inclui:
+Na última verificação local, os 207 testes passaram. A suíte inclui:
 
 - testes unitários de services e entidades;
 - Mockito para colaboradores isolados;

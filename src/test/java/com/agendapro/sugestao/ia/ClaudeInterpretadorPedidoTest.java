@@ -1,17 +1,21 @@
 package com.agendapro.sugestao.ia;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,11 +53,15 @@ class ClaudeInterpretadorPedidoTest {
 	private final List<String> chavesRecebidas = new CopyOnWriteArrayList<>();
 	private volatile int status;
 	private volatile String resposta;
+	private volatile long atrasoMs;
 
 	@BeforeEach
 	void iniciarServidor() throws IOException {
 		servidor = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
 		servidor.createContext("/v1/messages", this::responder);
+		// Uma thread por pedido: o teste de timeout segura a resposta e nao pode
+		// travar o retry atras dele.
+		servidor.setExecutor(Executors.newCachedThreadPool());
 		servidor.start();
 	}
 
@@ -146,24 +154,66 @@ class ClaudeInterpretadorPedidoTest {
 	}
 
 	@Test
-	void deveFicarIndisponivelQuandoARespostaHttpNaoEJson() {
-		// Proxy ou gateway no caminho devolvendo uma pagina de erro com status 200.
+	void deveTratarRespostaHttpQueNaoEJsonComoPossivelmenteCobrada() {
+		// Proxy no caminho devolvendo pagina de erro, ou resposta truncada: se a
+		// geracao aconteceu, ela foi cobrada.
 		status = 200;
 		resposta = "<html>Bad gateway</html>";
 
-		assertThrows(SugestaoIndisponivelException.class,
+		SugestaoIndisponivelException erro = assertThrows(SugestaoIndisponivelException.class,
 				() -> interpretador().interpretar("corte amanha", CATALOGO));
+		assertTrue(erro.podeTerSidoCobrada());
 	}
 
 	@Test
-	void deveFicarIndisponivelQuandoAApiFalhaMesmoDepoisDoRetry() {
+	void deveTratarTimeoutComoPossivelmenteCobrado() {
+		responderMensagem("end_turn", "{}");
+		atrasoMs = 1_000;
+		ClaudeInterpretadorPedido comPressa = new ClaudeInterpretadorPedido(
+				"chave-de-teste", "claude-haiku-5-5", urlServidor(), Duration.ofMillis(200));
+
+		SugestaoIndisponivelException erro = assertThrows(SugestaoIndisponivelException.class,
+				() -> comPressa.interpretar("corte amanha", CATALOGO));
+		assertTrue(erro.podeTerSidoCobrada(), "a API pode ter processado o pedido que estourou o tempo");
+		assertEquals(1, corposRecebidos.size(), "timeout nao e repetido, para nao pagar duas vezes");
+	}
+
+	@Test
+	void naoDeveRepetirPedidoRecusadoPorErroDoCliente() {
+		status = 400;
+		resposta = """
+				{"type":"error","error":{"type":"invalid_request_error","message":"bad request"}}""";
+
+		SugestaoIndisponivelException erro = assertThrows(SugestaoIndisponivelException.class,
+				() -> interpretador().interpretar("corte amanha", CATALOGO));
+		assertFalse(erro.podeTerSidoCobrada());
+		assertEquals(1, corposRecebidos.size(), "repetir um pedido invalido daria o mesmo erro");
+	}
+
+	@Test
+	void deveTratarErroDeStatusComoNaoCobradoDepoisDoRetry() {
 		status = 500;
 		resposta = """
 				{"type":"error","error":{"type":"api_error","message":"Internal server error"}}""";
 
-		assertThrows(SugestaoIndisponivelException.class,
+		SugestaoIndisponivelException erro = assertThrows(SugestaoIndisponivelException.class,
 				() -> interpretador().interpretar("corte amanha", CATALOGO));
+		assertFalse(erro.podeTerSidoCobrada());
 		assertEquals(2, corposRecebidos.size(), "uma tentativa e um retry");
+	}
+
+	@Test
+	void deveTratarConexaoRecusadaComoNaoCobrada() throws IOException {
+		int portaFechada;
+		try (ServerSocket socket = new ServerSocket(0)) {
+			portaFechada = socket.getLocalPort();
+		}
+		ClaudeInterpretadorPedido semServidor = new ClaudeInterpretadorPedido(
+				"chave-de-teste", "claude-haiku-5-5", "http://localhost:" + portaFechada);
+
+		SugestaoIndisponivelException erro = assertThrows(SugestaoIndisponivelException.class,
+				() -> semServidor.interpretar("corte amanha", CATALOGO));
+		assertFalse(erro.podeTerSidoCobrada());
 	}
 
 	@Test
@@ -171,8 +221,9 @@ class ClaudeInterpretadorPedidoTest {
 		ClaudeInterpretadorPedido semChave = new ClaudeInterpretadorPedido(
 				"", "claude-haiku-5-5", urlServidor());
 
-		assertThrows(SugestaoIndisponivelException.class,
+		SugestaoIndisponivelException erro = assertThrows(SugestaoIndisponivelException.class,
 				() -> semChave.interpretar("corte amanha", CATALOGO));
+		assertFalse(erro.podeTerSidoCobrada());
 		assertTrue(corposRecebidos.isEmpty());
 	}
 
@@ -206,10 +257,15 @@ class ClaudeInterpretadorPedidoTest {
 	private void responder(HttpExchange troca) throws IOException {
 		corposRecebidos.add(new String(troca.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
 		chavesRecebidas.add(troca.getRequestHeaders().getFirst("x-api-key"));
+		if (atrasoMs > 0) {
+			try {
+				Thread.sleep(atrasoMs);
+			} catch (InterruptedException exception) {
+				Thread.currentThread().interrupt();
+			}
+		}
 		byte[] corpo = resposta.getBytes(StandardCharsets.UTF_8);
 		troca.getResponseHeaders().add("Content-Type", "application/json");
-		// Retry imediato: o teste nao precisa esperar o backoff padrao do SDK.
-		troca.getResponseHeaders().add("retry-after-ms", "1");
 		troca.sendResponseHeaders(status, corpo.length);
 		try (OutputStream saida = troca.getResponseBody()) {
 			saida.write(corpo);

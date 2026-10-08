@@ -1,5 +1,8 @@
 package com.agendapro.sugestao.ia;
 
+import java.net.ConnectException;
+import java.net.NoRouteToHostException;
+import java.net.UnknownHostException;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.TextStyle;
@@ -8,6 +11,7 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -41,6 +45,7 @@ public class ClaudeInterpretadorPedido implements InterpretadorPedido {
 
 	private static final Locale PT_BR = Locale.forLanguageTag("pt-BR");
 	private static final int DIAS_NO_CALENDARIO = 14;
+	private static final Duration PAUSA_ANTES_DO_RETRY = Duration.ofMillis(500);
 
 	/**
 	 * Fica no system prompt o que nao muda entre chamadas. O que varia (catalogo,
@@ -79,23 +84,31 @@ public class ClaudeInterpretadorPedido implements InterpretadorPedido {
 	private final String modelo;
 	private final JsonOutputFormat formatoResposta;
 
+	@Autowired
 	public ClaudeInterpretadorPedido(
 			@Value("${app.ia.anthropic.api-key}") String apiKey,
 			@Value("${app.ia.anthropic.modelo}") String modelo,
 			@Value("${app.ia.anthropic.base-url}") String baseUrl
 	) {
+		// O cliente espera olhando para "Procurando...". Uma resposta normal leva
+		// poucos segundos; passando de 8s, o mais util e desistir e mostrar o
+		// fluxo manual.
+		this(apiKey, modelo, baseUrl, Duration.ofSeconds(8));
+	}
+
+	/** Os testes usam um timeout curto para nao esperar 16s por caso. */
+	ClaudeInterpretadorPedido(String apiKey, String modelo, String baseUrl, Duration timeout) {
 		this.client = apiKey.isBlank()
 				? null
 				: AnthropicOkHttpClient.builder()
 						.apiKey(apiKey)
 						.baseUrl(baseUrl)
-						// O cliente espera olhando para "Procurando...". Uma resposta
-						// normal leva poucos segundos; passando de 8s, o mais util e
-						// desistir e mostrar o fluxo manual. O retry existe para
-						// sobrecarga momentanea (429/529), e no pior caso a espera
-						// fica em cerca de 16s.
-						.timeout(Duration.ofSeconds(8))
-						.maxRetries(1)
+						.timeout(timeout)
+						// Sem retry automatico: o SDK repetiria tambem depois de um
+						// timeout, e so a ultima falha chegaria aqui. O retry fica em
+						// criarComRetryDeSobrecarga, onde se sabe o que cada tentativa
+						// pode ter custado.
+						.maxRetries(0)
 						.build();
 		this.modelo = modelo;
 		this.formatoResposta = formatoGeradoDaClasse(modelo);
@@ -104,7 +117,7 @@ public class ClaudeInterpretadorPedido implements InterpretadorPedido {
 	@Override
 	public PedidoInterpretado interpretar(String texto, CatalogoSugestao catalogo) {
 		if (client == null) {
-			throw new SugestaoIndisponivelException();
+			throw SugestaoIndisponivelException.semCobranca();
 		}
 
 		StructuredMessageCreateParams<PedidoInterpretado> params = MessageCreateParams.builder()
@@ -123,20 +136,25 @@ public class ClaudeInterpretadorPedido implements InterpretadorPedido {
 
 		StructuredMessage<PedidoInterpretado> resposta;
 		try {
-			resposta = client.messages().create(params);
+			resposta = criarComRetryDeSobrecarga(params);
 		} catch (AnthropicServiceException exception) {
+			// Erro com status (429, 529, 5xx, 4xx): a API recusou o pedido e nao
+			// cobra por ele.
 			log.warn("API do Claude respondeu status {} na sugestao de agendamento", exception.statusCode());
-			throw new SugestaoIndisponivelException();
+			throw SugestaoIndisponivelException.semCobranca();
 		} catch (AnthropicIoException exception) {
 			// A causa (timeout, conexao recusada, DNS) e o que diz onde procurar o
 			// problema. A mensagem da excecao de rede nao carrega o texto do cliente.
 			log.warn("Falha de rede ou timeout ao chamar a API do Claude: {}", descreverCausa(exception));
-			throw new SugestaoIndisponivelException();
+			throw pedidoNaoSaiu(exception)
+					? SugestaoIndisponivelException.semCobranca()
+					: SugestaoIndisponivelException.possivelmenteCobrada();
 		} catch (AnthropicInvalidDataException exception) {
 			// O corpo HTTP nem chegou a ser uma mensagem da API (pagina de erro de
-			// um proxy, resposta truncada). E falha de transporte, nao do modelo.
+			// um proxy, resposta truncada). Se foi truncada, a geracao aconteceu e
+			// foi cobrada.
 			log.warn("Resposta HTTP da API do Claude ilegivel: {}", descreverCausa(exception));
-			throw new SugestaoIndisponivelException();
+			throw SugestaoIndisponivelException.possivelmenteCobrada();
 		}
 
 		StopReason motivo = resposta.stopReason().orElse(null);
@@ -158,6 +176,53 @@ public class ClaudeInterpretadorPedido implements InterpretadorPedido {
 			log.warn("Resposta do Claude nao seguiu o formato esperado");
 			throw new PedidoNaoInterpretadoException();
 		}
+	}
+
+	/**
+	 * Repete uma vez so quando a API recusou o pedido por sobrecarga ou erro
+	 * interno (429, 529, 5xx). Essa recusa nao e cobrada, entao a segunda
+	 * tentativa nao dobra o custo, e a falha que sair daqui descreve o pedido
+	 * inteiro. Timeout e falha de rede nao sao repetidos: a primeira tentativa
+	 * pode ter sido processada, e repetir poderia pagar duas vezes.
+	 */
+	private StructuredMessage<PedidoInterpretado> criarComRetryDeSobrecarga(
+			StructuredMessageCreateParams<PedidoInterpretado> params
+	) {
+		try {
+			return client.messages().create(params);
+		} catch (AnthropicServiceException exception) {
+			if (exception.statusCode() != 429 && exception.statusCode() < 500) {
+				throw exception;
+			}
+			log.warn("API do Claude respondeu status {}; tentando de novo", exception.statusCode());
+			esperar(PAUSA_ANTES_DO_RETRY);
+			return client.messages().create(params);
+		}
+	}
+
+	private static void esperar(Duration pausa) {
+		try {
+			Thread.sleep(pausa);
+		} catch (InterruptedException exception) {
+			Thread.currentThread().interrupt();
+			throw SugestaoIndisponivelException.semCobranca();
+		}
+	}
+
+	/**
+	 * Conexao recusada, host desconhecido ou sem rota: o pedido nunca chegou a
+	 * API. Qualquer outra falha de rede (timeout, conexao caida no meio) pode ter
+	 * acontecido depois de a API comecar a processar.
+	 */
+	private static boolean pedidoNaoSaiu(Throwable exception) {
+		for (Throwable causa = exception; causa != null; causa = causa.getCause()) {
+			if (causa instanceof ConnectException
+					|| causa instanceof UnknownHostException
+					|| causa instanceof NoRouteToHostException) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static String descreverCausa(Throwable exception) {

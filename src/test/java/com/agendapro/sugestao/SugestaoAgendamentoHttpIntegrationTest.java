@@ -208,7 +208,6 @@ class SugestaoAgendamentoHttpIntegrationTest extends PostgresIntegrationTest {
 				troca.getRequestBody().readAllBytes();
 				byte[] corpo = respostaClaude.getBytes(StandardCharsets.UTF_8);
 				troca.getResponseHeaders().add("Content-Type", "application/json");
-				troca.getResponseHeaders().add("retry-after-ms", "1");
 				troca.sendResponseHeaders(statusClaude, corpo.length);
 				try (OutputStream saida = troca.getResponseBody()) {
 					saida.write(corpo);
