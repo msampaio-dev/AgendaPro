@@ -42,3 +42,8 @@ services:
         sync: false
       - key: CORS_ALLOWED_ORIGINS
         sync: false
+
+      # Chave da API da Anthropic para a sugestao por IA. Sem ela a aplicacao
+      # funciona e a sugestao responde 503.
+      - key: ANTHROPIC_API_KEY
+        sync: false
