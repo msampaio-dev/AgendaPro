@@ -114,6 +114,41 @@ class LimiteUsoSugestaoIntegrationTest extends PostgresIntegrationTest {
 		assertEquals(3, usosRegistrados(usuarioId));
 	}
 
+	@Test
+	void naoDevePassarDoTetoGlobalComRajadaDeContasDiferentes() throws Exception {
+		// Cadastro aberto: quem quiser furar o teto cria contas e pede tudo de uma vez.
+		int contas = 12;
+		List<Long> usuarios = new ArrayList<>();
+		for (int i = 0; i < contas; i++) {
+			usuarios.add(inserirUsuario("rajada%02d@teste.com".formatted(i)));
+		}
+		CountDownLatch largada = new CountDownLatch(1);
+		List<Future<Boolean>> resultados = new ArrayList<>();
+
+		try (ExecutorService executor = Executors.newFixedThreadPool(contas)) {
+			for (Long usuarioId : usuarios) {
+				resultados.add(executor.submit(() -> {
+					largada.await();
+					try {
+						limite.registrarUso(usuarioId);
+						return true;
+					} catch (LimiteSugestoesAtingidoException exception) {
+						return false;
+					}
+				}));
+			}
+			largada.countDown();
+
+			long aceitas = 0;
+			for (Future<Boolean> resultado : resultados) {
+				if (resultado.get()) aceitas++;
+			}
+			assertEquals(5, aceitas);
+		}
+		assertEquals(5, jdbcTemplate.queryForObject(
+				"SELECT SUM(quantidade) FROM usos_sugestao_agendamento", Integer.class));
+	}
+
 	private int usosRegistrados(Long usuarioId) {
 		return jdbcTemplate.queryForObject(
 				"SELECT quantidade FROM usos_sugestao_agendamento WHERE usuario_id = ?",

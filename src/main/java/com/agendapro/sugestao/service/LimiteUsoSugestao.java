@@ -20,15 +20,16 @@ import com.agendapro.sugestao.exception.LimiteSugestoesAtingidoException;
  * aplicacao.
  *
  * O limite por usuario sozinho nao basta, porque o cadastro e aberto e quem
- * quisesse abusar criaria contas novas. O teto global fecha esse caminho; ele e
- * aproximado (duas requisicoes simultaneas podem passar uma unidade do teto),
- * o que e aceitavel para um limite de custo.
+ * quisesse abusar criaria contas novas. O teto global fecha esse caminho.
  */
 @Component
 public class LimiteUsoSugestao {
 
 	/** O "dia" do limite segue o horario de quem usa a demonstracao. */
 	static final ZoneId FUSO_DO_LIMITE = ZoneId.of("America/Sao_Paulo");
+
+	/** Identifica as travas deste limitador entre as advisory locks do banco. */
+	private static final int NAMESPACE_TRAVA = 0x5_06E5;
 
 	private final JdbcTemplate jdbcTemplate;
 	private final Clock clock;
@@ -51,12 +52,25 @@ public class LimiteUsoSugestao {
 	 * Registra um uso e devolve o dia contado e quantos usos ainda restam nele.
 	 *
 	 * O incremento acontece antes da verificacao e dentro da mesma transacao: se
-	 * o limite estourar, a excecao desfaz o incremento. O upsert trava a linha do
-	 * usuario, entao duas requisicoes dele ao mesmo tempo sao contadas em fila.
+	 * o limite estourar, a excecao desfaz o incremento.
+	 *
+	 * A trava do dia coloca em fila os pedidos de todas as contas. Sem ela, cada
+	 * transacao somava os usos sem enxergar os incrementos ainda nao confirmados
+	 * das outras, e uma rajada de contas novas passava junto do teto global (no
+	 * teste, 10 pedidos aceitos com teto de 5). A trava e de transacao: o banco a
+	 * solta no commit ou no rollback, sem risco de ficar presa. O trecho travado
+	 * sao duas instrucoes curtas, sem chamada a IA, entao a fila anda rapido.
 	 */
 	@Transactional
 	public UsoRegistrado registrarUso(Long usuarioId) {
 		LocalDate hoje = LocalDate.now(clock.withZone(FUSO_DO_LIMITE));
+
+		jdbcTemplate.query(
+				"SELECT pg_advisory_xact_lock(?, ?)",
+				resultado -> null,
+				NAMESPACE_TRAVA,
+				(int) hoje.toEpochDay()
+		);
 
 		Integer usosDoUsuario = jdbcTemplate.queryForObject(
 				"INSERT INTO usos_sugestao_agendamento (usuario_id, dia, quantidade) "
