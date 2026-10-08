@@ -146,6 +146,16 @@ class ClaudeInterpretadorPedidoTest {
 	}
 
 	@Test
+	void deveFicarIndisponivelQuandoARespostaHttpNaoEJson() {
+		// Proxy ou gateway no caminho devolvendo uma pagina de erro com status 200.
+		status = 200;
+		resposta = "<html>Bad gateway</html>";
+
+		assertThrows(SugestaoIndisponivelException.class,
+				() -> interpretador().interpretar("corte amanha", CATALOGO));
+	}
+
+	@Test
 	void deveFicarIndisponivelQuandoAApiFalhaMesmoDepoisDoRetry() {
 		status = 500;
 		resposta = """
