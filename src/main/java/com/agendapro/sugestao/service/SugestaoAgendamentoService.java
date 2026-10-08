@@ -16,6 +16,7 @@ import com.agendapro.disponibilidade.dto.HorarioDisponivelResponse;
 import com.agendapro.disponibilidade.service.DisponibilidadeService;
 import com.agendapro.sugestao.dto.SugestaoAgendamentoResponse;
 import com.agendapro.sugestao.exception.PedidoNaoInterpretadoException;
+import com.agendapro.sugestao.exception.SugestaoIndisponivelException;
 import com.agendapro.sugestao.ia.CatalogoSugestao;
 import com.agendapro.sugestao.ia.InterpretadorPedido;
 import com.agendapro.sugestao.ia.PedidoInterpretado;
@@ -62,15 +63,25 @@ public class SugestaoAgendamentoService {
 	}
 
 	public SugestaoAgendamentoResponse sugerir(Long usuarioId, String texto) {
-		// O uso conta antes da chamada: e ela que custa, tenha dado certo ou nao.
-		int restantes = limiteUso.registrarUso(usuarioId);
+		// O uso conta antes da chamada, para que requisicoes simultaneas nao
+		// passem todas do limite enquanto esperam a IA.
+		LimiteUsoSugestao.UsoRegistrado uso = limiteUso.registrarUso(usuarioId);
 
 		LocalDate hoje = LocalDate.now(clock.withZone(FUSO_PADRAO));
 		CatalogoSugestao catalogo = catalogoService.montar(hoje);
-		PedidoInterpretado pedido = interpretador.interpretar(texto, catalogo);
+		PedidoInterpretado pedido;
+		try {
+			pedido = interpretador.interpretar(texto, catalogo);
+		} catch (SugestaoIndisponivelException exception) {
+			// A IA nao respondeu: o cliente nao recebeu nada e o uso volta. Quando
+			// ela responde algo invalido (422) o uso fica contado, porque a
+			// chamada aconteceu e foi paga.
+			limiteUso.devolverUso(usuarioId, uso.dia());
+			throw exception;
+		}
 
 		Escolha escolha = validar(pedido, catalogo, hoje);
-		return buscarHorarios(escolha, pedido, hoje, restantes);
+		return buscarHorarios(escolha, pedido, hoje, uso.restantes());
 	}
 
 	private Escolha validar(PedidoInterpretado pedido, CatalogoSugestao catalogo, LocalDate hoje) {

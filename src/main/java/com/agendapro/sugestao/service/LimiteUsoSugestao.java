@@ -48,14 +48,14 @@ public class LimiteUsoSugestao {
 	}
 
 	/**
-	 * Registra um uso e devolve quantos ainda restam ao usuario hoje.
+	 * Registra um uso e devolve o dia contado e quantos usos ainda restam nele.
 	 *
 	 * O incremento acontece antes da verificacao e dentro da mesma transacao: se
 	 * o limite estourar, a excecao desfaz o incremento. O upsert trava a linha do
 	 * usuario, entao duas requisicoes dele ao mesmo tempo sao contadas em fila.
 	 */
 	@Transactional
-	public int registrarUso(Long usuarioId) {
+	public UsoRegistrado registrarUso(Long usuarioId) {
 		LocalDate hoje = LocalDate.now(clock.withZone(FUSO_DO_LIMITE));
 
 		Integer usosDoUsuario = jdbcTemplate.queryForObject(
@@ -81,6 +81,36 @@ public class LimiteUsoSugestao {
 			throw new LimiteSugestoesAtingidoException();
 		}
 
-		return limitePorUsuario - usosDoUsuario;
+		return new UsoRegistrado(hoje, limitePorUsuario - usosDoUsuario);
+	}
+
+	/**
+	 * Desfaz um uso que nao chegou a gerar resposta da IA (sem chave, rede fora,
+	 * API indisponivel). Sem isso, uma queda da API consumiria a cota do cliente
+	 * sem que ele recebesse nada.
+	 *
+	 * Recebe o dia do registro, e nao o de agora, para que uma chamada que cruza a
+	 * meia-noite devolva o uso ao dia em que ele foi contado. A ultima unidade
+	 * apaga a linha, porque a tabela nao aceita quantidade zero.
+	 */
+	@Transactional
+	public void devolverUso(Long usuarioId, LocalDate dia) {
+		int atualizadas = jdbcTemplate.update(
+				"UPDATE usos_sugestao_agendamento SET quantidade = quantidade - 1 "
+				+ "WHERE usuario_id = ? AND dia = ? AND quantidade > 1",
+				usuarioId,
+				dia
+		);
+		if (atualizadas == 0) {
+			jdbcTemplate.update(
+					"DELETE FROM usos_sugestao_agendamento "
+					+ "WHERE usuario_id = ? AND dia = ? AND quantidade = 1",
+					usuarioId,
+					dia
+			);
+		}
+	}
+
+	public record UsoRegistrado(LocalDate dia, int restantes) {
 	}
 }

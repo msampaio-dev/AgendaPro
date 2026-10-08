@@ -3,6 +3,7 @@ package com.agendapro.sugestao;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -41,13 +42,32 @@ class LimiteUsoSugestaoIntegrationTest extends PostgresIntegrationTest {
 	void deveContarUsosEBloquearDepoisDoLimiteDoUsuario() {
 		Long usuarioId = inserirUsuario("cliente@teste.com");
 
-		assertEquals(2, limite.registrarUso(usuarioId));
-		assertEquals(1, limite.registrarUso(usuarioId));
-		assertEquals(0, limite.registrarUso(usuarioId));
+		assertEquals(2, limite.registrarUso(usuarioId).restantes());
+		assertEquals(1, limite.registrarUso(usuarioId).restantes());
+		assertEquals(0, limite.registrarUso(usuarioId).restantes());
 		assertThrows(LimiteSugestoesAtingidoException.class, () -> limite.registrarUso(usuarioId));
 
 		// A tentativa recusada nao fica contada: o rollback desfaz o incremento.
 		assertEquals(3, usosRegistrados(usuarioId));
+	}
+
+	@Test
+	void deveDevolverUsoAteApagarALinha() {
+		Long usuarioId = inserirUsuario("devolucao@teste.com");
+		LocalDate dia = limite.registrarUso(usuarioId).dia();
+		limite.registrarUso(usuarioId);
+
+		limite.devolverUso(usuarioId, dia);
+		assertEquals(1, usosRegistrados(usuarioId));
+
+		limite.devolverUso(usuarioId, dia);
+		assertEquals(0, jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM usos_sugestao_agendamento WHERE usuario_id = ?",
+				Integer.class, usuarioId));
+
+		// Devolver sem nada registrado nao quebra nem cria quantidade negativa.
+		limite.devolverUso(usuarioId, dia);
+		assertEquals(2, limite.registrarUso(usuarioId).restantes());
 	}
 
 	@Test
