@@ -125,7 +125,9 @@ public class ClaudeInterpretadorPedido implements InterpretadorPedido {
 			log.warn("API do Claude respondeu status {} na sugestao de agendamento", exception.statusCode());
 			throw new SugestaoIndisponivelException();
 		} catch (AnthropicIoException exception) {
-			log.warn("Falha de rede ou timeout ao chamar a API do Claude");
+			// A causa (timeout, conexao recusada, DNS) e o que diz onde procurar o
+			// problema. A mensagem da excecao de rede nao carrega o texto do cliente.
+			log.warn("Falha de rede ou timeout ao chamar a API do Claude: {}", descreverCausa(exception));
 			throw new SugestaoIndisponivelException();
 		}
 
@@ -148,6 +150,11 @@ public class ClaudeInterpretadorPedido implements InterpretadorPedido {
 			log.warn("Resposta do Claude nao seguiu o formato esperado");
 			throw new PedidoNaoInterpretadoException();
 		}
+	}
+
+	private static String descreverCausa(Throwable exception) {
+		Throwable causa = exception.getCause() == null ? exception : exception.getCause();
+		return causa.getClass().getSimpleName() + ": " + causa.getMessage();
 	}
 
 	static String mensagem(String texto, CatalogoSugestao catalogo) {
