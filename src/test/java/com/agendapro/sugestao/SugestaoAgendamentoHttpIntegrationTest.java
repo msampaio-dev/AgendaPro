@@ -189,7 +189,7 @@ class SugestaoAgendamentoHttpIntegrationTest extends PostgresIntegrationTest {
 	private static void responderClaude(String json) {
 		statusClaude = 200;
 		respostaClaude = """
-				{"id":"msg_teste","type":"message","role":"assistant","model":"claude-opus-5-5",\
+				{"id":"msg_teste","type":"message","role":"assistant","model":"claude-haiku-5-5",\
 				"content":[{"type":"text","text":%s}],"stop_reason":"end_turn","stop_sequence":null,\
 				"usage":{"input_tokens":900,"output_tokens":120}}"""
 				.formatted("\"" + json.replace("\"", "\\\"") + "\"");
