@@ -61,7 +61,7 @@ A decisão final é do cliente porque alguns erros do modelo parecem acertos par
 | A API do Claude recusa o pedido por sobrecarga ou erro interno | Uma nova tentativa; se falhar de novo, 503 e o uso volta para a cota, porque recusas não são cobradas |
 | A API do Claude demora mais de 8 s | 503 sem nova tentativa, e o uso continua contado, porque o pedido pode ter sido processado e cobrado |
 | O dia pedido não tem vaga no período | A sugestão traz a próxima data com vaga e avisa a troca |
-| Alguém tenta gastar a cota da demonstração | Limite de 5 sugestões por usuário e 30 no total por dia, contados no banco |
+| Alguém tenta gastar a cota da demonstração | Limite de 5 sugestões por usuário e 30 no total por dia, contados no banco, com uma trava que vale também para rajadas de contas novas |
 | O texto tenta dar ordens ao modelo | O texto vai delimitado como dado, e só ids do catálogo passam pela validação |
 
 A chave da API fica só na variável de ambiente `ANTHROPIC_API_KEY`. Sem ela a aplicação funciona normalmente e a sugestão responde 503. Os testes nunca chamam a API real: um servidor HTTP local faz o papel do Claude e devolve respostas válidas, JSON quebrado, recusa, resposta cortada e erro 500.
@@ -207,7 +207,7 @@ Todos os endpoints usam o prefixo `/api/v1`.
 .\mvnw.cmd verify
 ```
 
-Na última verificação local, os 207 testes passaram. A suíte inclui:
+Na última verificação local, os 210 testes passaram. A suíte inclui:
 
 - testes unitários de services e entidades;
 - Mockito para colaboradores isolados;
@@ -267,7 +267,7 @@ A demonstração está em [https://agenda-pro-web-agendapro2.vercel.app](https:/
 - As imagens ficam no banco, em `BYTEA`, e não num object storage. O disco do plano gratuito é efêmero e apagava as fotos a cada implantação, e guardá-las no banco resolveu com a infraestrutura que já existia. Com mais volume, o certo seria S3 ou equivalente; a troca fica contida em `ArmazenamentoImagemService`.
 - As fotos são gravadas no tamanho original, sem redimensionamento no upload, então uma capa pode ocupar alguns megabytes.
 - A observabilidade é mínima: há health check, mas não há métricas nem rastreamento distribuído.
-- O catálogo inteiro vai no prompt da sugestão por IA. Com as três barbearias da demonstração isso cabe com folga; com centenas de unidades seria preciso filtrar antes, por cidade, por exemplo.
+- O catálogo vai no prompt da sugestão por IA, com no máximo 30 serviços e 30 profissionais por barbearia. Se mesmo assim a mensagem passar de 40 mil caracteres, a IA não é chamada e a sugestão fica indisponível, o que protege o custo de cada chamada. Com centenas de unidades seria preciso filtrar o catálogo antes, por cidade, por exemplo.
 - O ambiente de demonstração é compartilhado. Os dados são fictícios e qualquer visitante pode alterá-los.
 
 ## Autor
