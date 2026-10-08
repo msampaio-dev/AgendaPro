@@ -89,9 +89,12 @@ public class ClaudeInterpretadorPedido implements InterpretadorPedido {
 				: AnthropicOkHttpClient.builder()
 						.apiKey(apiKey)
 						.baseUrl(baseUrl)
-						// O cliente espera na tela; melhor desistir e cair no fluxo
-						// manual do que prender a requisicao por minutos.
-						.timeout(Duration.ofSeconds(20))
+						// O cliente espera olhando para "Procurando...". Uma resposta
+						// normal leva poucos segundos; passando de 8s, o mais util e
+						// desistir e mostrar o fluxo manual. O retry existe para
+						// sobrecarga momentanea (429/529), e no pior caso a espera
+						// fica em cerca de 16s.
+						.timeout(Duration.ofSeconds(8))
 						.maxRetries(1)
 						.build();
 		this.modelo = modelo;
