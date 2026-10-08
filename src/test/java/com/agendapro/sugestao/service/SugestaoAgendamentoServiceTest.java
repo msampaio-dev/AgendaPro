@@ -244,13 +244,23 @@ class SugestaoAgendamentoServiceTest {
 	}
 
 	@Test
-	void devePropagarIndisponibilidadeDaIa() {
+	void deveDevolverUsoQuandoAIaFicaIndisponivelSemCobranca() {
 		when(limiteUso.registrarUso(USUARIO_ID)).thenReturn(new LimiteUsoSugestao.UsoRegistrado(HOJE, 9));
 		when(catalogoService.montar(HOJE)).thenReturn(CATALOGO);
-		when(interpretador.interpretar(TEXTO, CATALOGO)).thenThrow(new SugestaoIndisponivelException());
+		when(interpretador.interpretar(TEXTO, CATALOGO)).thenThrow(SugestaoIndisponivelException.semCobranca());
 
 		assertThrows(SugestaoIndisponivelException.class, () -> service.sugerir(USUARIO_ID, TEXTO));
 		verify(limiteUso).devolverUso(USUARIO_ID, HOJE);
+	}
+
+	@Test
+	void naoDeveDevolverUsoQuandoAChamadaPodeTerSidoCobrada() {
+		when(limiteUso.registrarUso(USUARIO_ID)).thenReturn(new LimiteUsoSugestao.UsoRegistrado(HOJE, 9));
+		when(catalogoService.montar(HOJE)).thenReturn(CATALOGO);
+		when(interpretador.interpretar(TEXTO, CATALOGO)).thenThrow(SugestaoIndisponivelException.possivelmenteCobrada());
+
+		assertThrows(SugestaoIndisponivelException.class, () -> service.sugerir(USUARIO_ID, TEXTO));
+		verify(limiteUso, never()).devolverUso(any(), any());
 	}
 
 	@Test
