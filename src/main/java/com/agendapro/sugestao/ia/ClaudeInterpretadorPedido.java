@@ -48,6 +48,14 @@ public class ClaudeInterpretadorPedido implements InterpretadorPedido {
 	private static final Duration PAUSA_ANTES_DO_RETRY = Duration.ofMillis(500);
 
 	/**
+	 * Teto de custo por chamada. O catalogo da demonstracao cabe em uns 2 mil
+	 * caracteres; 40 mil sao cerca de 12 mil tokens, menos de um decimo de
+	 * centavo de dolar no Haiku. Sem esse teto, um catalogo inflado por quem
+	 * cadastra servicos faria cada chamada custar centenas de vezes mais.
+	 */
+	static final int MAXIMO_CARACTERES_MENSAGEM = 40_000;
+
+	/**
 	 * Fica no system prompt o que nao muda entre chamadas. O que varia (catalogo,
 	 * data, texto) vai na mensagem do usuario.
 	 */
@@ -120,11 +128,18 @@ public class ClaudeInterpretadorPedido implements InterpretadorPedido {
 			throw SugestaoIndisponivelException.semCobranca();
 		}
 
+		String mensagem = mensagem(texto, catalogo);
+		if (mensagem.length() > MAXIMO_CARACTERES_MENSAGEM) {
+			log.warn("Catalogo grande demais para a sugestao ({} caracteres); IA nao chamada",
+					mensagem.length());
+			throw SugestaoIndisponivelException.semCobranca();
+		}
+
 		StructuredMessageCreateParams<PedidoInterpretado> params = MessageCreateParams.builder()
 				.model(modelo)
 				.maxTokens(4096L)
 				.system(PROMPT_SISTEMA)
-				.addUserMessage(mensagem(texto, catalogo))
+				.addUserMessage(mensagem)
 				.outputConfig(PedidoInterpretado.class)
 				// Extrair campos de um texto curto e tarefa simples: esforco baixo
 				// gasta menos tokens de raciocinio e responde mais rapido.
