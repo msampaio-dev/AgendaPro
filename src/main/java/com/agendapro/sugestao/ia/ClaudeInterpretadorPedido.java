@@ -132,6 +132,11 @@ public class ClaudeInterpretadorPedido implements InterpretadorPedido {
 			// problema. A mensagem da excecao de rede nao carrega o texto do cliente.
 			log.warn("Falha de rede ou timeout ao chamar a API do Claude: {}", descreverCausa(exception));
 			throw new SugestaoIndisponivelException();
+		} catch (AnthropicInvalidDataException exception) {
+			// O corpo HTTP nem chegou a ser uma mensagem da API (pagina de erro de
+			// um proxy, resposta truncada). E falha de transporte, nao do modelo.
+			log.warn("Resposta HTTP da API do Claude ilegivel: {}", descreverCausa(exception));
+			throw new SugestaoIndisponivelException();
 		}
 
 		StopReason motivo = resposta.stopReason().orElse(null);
