@@ -102,7 +102,7 @@ class ClaudeInterpretadorPedidoTest {
 
 		assertEquals(List.of("chave-de-teste"), chavesRecebidas);
 		String corpo = corposRecebidos.get(0);
-		assertTrue(corpo.contains("\"model\":\"claude-opus-5-5\""), corpo);
+		assertTrue(corpo.contains("\"model\":\"claude-haiku-5-5\""), corpo);
 		assertTrue(corpo.contains("\"effort\":\"low\""), corpo);
 		assertTrue(corpo.contains("\"type\":\"json_schema\""), corpo);
 		assertTrue(corpo.contains("Profissional 10: João Gabriel"), corpo);
@@ -159,7 +159,7 @@ class ClaudeInterpretadorPedidoTest {
 	@Test
 	void deveFicarIndisponivelSemChaveSemFazerRequisicao() {
 		ClaudeInterpretadorPedido semChave = new ClaudeInterpretadorPedido(
-				"", "claude-opus-5-5", urlServidor());
+				"", "claude-haiku-5-5", urlServidor());
 
 		assertThrows(SugestaoIndisponivelException.class,
 				() -> semChave.interpretar("corte amanha", CATALOGO));
@@ -167,7 +167,7 @@ class ClaudeInterpretadorPedidoTest {
 	}
 
 	private ClaudeInterpretadorPedido interpretador() {
-		return new ClaudeInterpretadorPedido("chave-de-teste", "claude-opus-5-5", urlServidor());
+		return new ClaudeInterpretadorPedido("chave-de-teste", "claude-haiku-5-5", urlServidor());
 	}
 
 	private String urlServidor() {
@@ -184,7 +184,7 @@ class ClaudeInterpretadorPedidoTest {
 
 	private static String mensagem(String motivoParada, String blocos) {
 		return """
-				{"id":"msg_teste","type":"message","role":"assistant","model":"claude-opus-5-5",\
+				{"id":"msg_teste","type":"message","role":"assistant","model":"claude-haiku-5-5",\
 				"content":%s,"stop_reason":"%s","stop_sequence":null,\
 				"usage":{"input_tokens":900,"output_tokens":120}}""".formatted(blocos, motivoParada);
 	}
