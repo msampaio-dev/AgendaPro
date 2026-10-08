@@ -60,7 +60,7 @@ A decisão final é do cliente porque alguns erros do modelo parecem acertos par
 | O modelo recusa o pedido ou a resposta vem cortada | 422 |
 | A API do Claude cai ou demora mais de 20 s | 503, e o fluxo manual continua funcionando |
 | O dia pedido não tem vaga no período | A sugestão traz a próxima data com vaga e avisa a troca |
-| Alguém tenta gastar a cota da demonstração | Limite de 5 sugestões por usuário e 15 no total por dia, contados no banco |
+| Alguém tenta gastar a cota da demonstração | Limite de 5 sugestões por usuário e 30 no total por dia, contados no banco |
 | O texto tenta dar ordens ao modelo | O texto vai delimitado como dado, e só ids do catálogo passam pela validação |
 
 A chave da API fica só na variável de ambiente `ANTHROPIC_API_KEY`. Sem ela a aplicação funciona normalmente e a sugestão responde 503. Os testes nunca chamam a API real: um servidor HTTP local faz o papel do Claude e devolve respostas válidas, JSON quebrado, recusa, resposta cortada e erro 500.
