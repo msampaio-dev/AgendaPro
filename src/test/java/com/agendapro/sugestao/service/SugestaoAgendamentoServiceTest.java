@@ -164,6 +164,7 @@ class SugestaoAgendamentoServiceTest {
 
 		assertThrows(PedidoNaoInterpretadoException.class, () -> service.sugerir(USUARIO_ID, TEXTO));
 		verifyNoInteractions(disponibilidadeService);
+		verify(limiteUso, never()).devolverUso(any(), any());
 	}
 
 	@Test
@@ -244,11 +245,22 @@ class SugestaoAgendamentoServiceTest {
 
 	@Test
 	void devePropagarIndisponibilidadeDaIa() {
-		when(limiteUso.registrarUso(USUARIO_ID)).thenReturn(9);
+		when(limiteUso.registrarUso(USUARIO_ID)).thenReturn(new LimiteUsoSugestao.UsoRegistrado(HOJE, 9));
 		when(catalogoService.montar(HOJE)).thenReturn(CATALOGO);
 		when(interpretador.interpretar(TEXTO, CATALOGO)).thenThrow(new SugestaoIndisponivelException());
 
 		assertThrows(SugestaoIndisponivelException.class, () -> service.sugerir(USUARIO_ID, TEXTO));
+		verify(limiteUso).devolverUso(USUARIO_ID, HOJE);
+	}
+
+	@Test
+	void naoDeveDevolverUsoQuandoAIaRespondeAlgoInvalido() {
+		when(limiteUso.registrarUso(USUARIO_ID)).thenReturn(new LimiteUsoSugestao.UsoRegistrado(HOJE, 9));
+		when(catalogoService.montar(HOJE)).thenReturn(CATALOGO);
+		when(interpretador.interpretar(TEXTO, CATALOGO)).thenThrow(new PedidoNaoInterpretadoException());
+
+		assertThrows(PedidoNaoInterpretadoException.class, () -> service.sugerir(USUARIO_ID, TEXTO));
+		verify(limiteUso, never()).devolverUso(any(), any());
 	}
 
 	@Test
@@ -270,7 +282,7 @@ class SugestaoAgendamentoServiceTest {
 	}
 
 	private void prepararChamada(PedidoInterpretado pedido) {
-		when(limiteUso.registrarUso(USUARIO_ID)).thenReturn(7);
+		when(limiteUso.registrarUso(USUARIO_ID)).thenReturn(new LimiteUsoSugestao.UsoRegistrado(HOJE, 7));
 		when(catalogoService.montar(HOJE)).thenReturn(CATALOGO);
 		when(interpretador.interpretar(any(), eq(CATALOGO))).thenReturn(pedido);
 	}

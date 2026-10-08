@@ -118,16 +118,22 @@ class SugestaoAgendamentoHttpIntegrationTest extends PostgresIntegrationTest {
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("{\"texto\":\"corte amanha\"}"))
 				.andExpect(status().isServiceUnavailable());
+
+		// A IA nao respondeu, entao o uso foi devolvido.
+		assertEquals(0, jdbc.queryForObject(
+				"SELECT COUNT(*) FROM usos_sugestao_agendamento", Integer.class));
 	}
 
 	@Test
 	void deveBloquearDepoisDoLimiteDiario() throws Exception {
-		statusClaude = 529;
-		respostaClaude = "{}";
+		// Respostas invalidas contam no limite: a IA respondeu e a chamada foi paga.
+		responderClaude("""
+				{"barbeariaId":null,"profissionalId":null,"servicoId":987654,"servicoAdicionalId":null,\
+				"data":null,"periodo":"QUALQUER","observacao":""}""");
 		String token = tokenDeCliente("insistente@teste.com");
 
 		for (int tentativa = 0; tentativa < 3; tentativa++) {
-			pedir(token).andExpect(status().isServiceUnavailable());
+			pedir(token).andExpect(status().isUnprocessableEntity());
 		}
 		pedir(token).andExpect(status().isTooManyRequests());
 	}
