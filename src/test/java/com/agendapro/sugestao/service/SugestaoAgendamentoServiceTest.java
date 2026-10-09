@@ -13,11 +13,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -51,8 +48,7 @@ class SugestaoAgendamentoServiceTest {
 	private static final Long USUARIO_ID = 1L;
 	private static final String TEXTO = "corte e barba sexta a tarde com o joao";
 
-	/** Quarta-feira, 7 de outubro de 2026, 10h em Sao Paulo. */
-	private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-10-07T13:00:00Z"), ZoneOffset.UTC);
+	/** Quarta-feira: o dia que o limitador devolve como contado. */
 	private static final LocalDate HOJE = LocalDate.of(2026, 10, 7);
 	private static final LocalDate SEXTA = LocalDate.of(2026, 10, 9);
 
@@ -95,7 +91,7 @@ class SugestaoAgendamentoServiceTest {
 	@BeforeEach
 	void configurar() {
 		service = new SugestaoAgendamentoService(
-				limiteUso, catalogoService, interpretador, disponibilidadeService, CLOCK);
+				limiteUso, catalogoService, interpretador, disponibilidadeService);
 	}
 
 	@Test
