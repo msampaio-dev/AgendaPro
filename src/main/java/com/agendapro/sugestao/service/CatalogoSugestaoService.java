@@ -2,6 +2,7 @@ package com.agendapro.sugestao.service;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -20,8 +21,8 @@ import com.agendapro.sugestao.ia.CatalogoSugestao;
  * Monta a lista fechada do que pode ser sugerido: so barbearias, profissionais
  * e servicos ativos, com quem faz o que.
  *
- * As consultas sao uma por barbearia e por profissional. Com o catalogo da
- * demonstracao (tres barbearias, seis profissionais) isso nao pesa; com centenas
+ * Sao tres consultas por barbearia: servicos, equipe e associacoes. Com o
+ * catalogo da demonstracao (tres barbearias) isso nao pesa; com centenas
  * de unidades o catalogo inteiro nem caberia no prompt e o desenho teria que
  * mudar (filtrar pela cidade do cliente, ou deixar o modelo buscar por
  * ferramenta).
@@ -79,30 +80,38 @@ public class CatalogoSugestaoService {
 				.map(CatalogoSugestao.Servico::id)
 				.collect(Collectors.toSet());
 
-		List<CatalogoSugestao.Profissional> profissionais = profissionalRepository
-				.findTop30ByBarbeariaIdAndAtivoTrueAndUsuarioAtivoTrueOrderByIdAsc(barbearia.getId())
-				.stream()
-				.map(profissional -> profissional(profissional, servicoIds))
+		List<Profissional> equipe = profissionalRepository
+				.findTop30ByBarbeariaIdAndAtivoTrueAndUsuarioAtivoTrueOrderByIdAsc(barbearia.getId());
+		Map<Long, List<Long>> servicosPorProfissional = servicosPorProfissional(equipe, servicoIds);
+
+		List<CatalogoSugestao.Profissional> profissionais = equipe.stream()
+				.map(profissional -> new CatalogoSugestao.Profissional(
+						profissional.getId(),
+						profissional.getUsuario().getNome(),
+						servicosPorProfissional.getOrDefault(profissional.getId(), List.of())))
 				.toList();
 
 		return new CatalogoSugestao.Barbearia(
 				barbearia.getId(), barbearia.getNome(), profissionais, servicos);
 	}
 
-	private CatalogoSugestao.Profissional profissional(
-			Profissional profissional,
+	/** Uma consulta por barbearia, em vez de uma por profissional. */
+	private Map<Long, List<Long>> servicosPorProfissional(
+			List<Profissional> equipe,
 			Set<Long> servicosDoCatalogo
 	) {
-		List<Long> servicoIds = servicosDoCatalogo.isEmpty()
-				? List.of()
-				: profissionalServicoRepository
-						.findAllByProfissionalIdAndAtivoTrueAndServicoIdIn(
-								profissional.getId(), servicosDoCatalogo)
-						.stream()
-						.map(associacao -> associacao.getServico().getId())
-						.sorted()
-						.toList();
-		return new CatalogoSugestao.Profissional(
-				profissional.getId(), profissional.getUsuario().getNome(), servicoIds);
+		if (equipe.isEmpty() || servicosDoCatalogo.isEmpty()) {
+			return Map.of();
+		}
+		List<Long> profissionalIds = equipe.stream().map(Profissional::getId).toList();
+		return profissionalServicoRepository
+				.findAllByProfissionalIdInAndServicoIdInAndAtivoTrue(profissionalIds, servicosDoCatalogo)
+				.stream()
+				.collect(Collectors.groupingBy(
+						associacao -> associacao.getProfissional().getId(),
+						Collectors.mapping(
+								associacao -> associacao.getServico().getId(),
+								Collectors.collectingAndThen(Collectors.toList(),
+										ids -> ids.stream().sorted().toList()))));
 	}
 }
