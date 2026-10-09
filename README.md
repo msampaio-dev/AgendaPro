@@ -20,6 +20,7 @@ API de agendamento para barbearias, em Java 21 e Spring Boot. Cada barbearia tem
 - Cliente, profissional, proprietário da barbearia e administrador têm permissões diferentes.
 - O Hibernate só valida o schema. Toda mudança no banco passa pelo Flyway.
 - Os testes de integração rodam num PostgreSQL descartável, com Testcontainers, e nunca tocam o banco local.
+- O cliente pode descrever o agendamento em texto livre. O Claude interpreta o pedido, e a API confere a resposta e calcula os horários com as regras de sempre.
 
 ## O produto
 
@@ -44,6 +45,27 @@ A proteção acontece em duas camadas:
 
 Um teste de concorrência com PostgreSQL real dispara duas requisições praticamente ao mesmo tempo e confirma que só uma consegue reservar o intervalo.
 
+## Sugestão de agendamento com IA
+
+Em vez de clicar etapa por etapa, o cliente pode escrever o que quer, como "corte e barba sexta à tarde com o João". A API manda esse texto ao Claude com a lista de barbearias, profissionais e serviços ativos e um calendário dos próximos 14 dias. O modelo responde com um JSON que traz ids dessa lista, uma data e o período do dia. A chamada usa saída estruturada, então o JSON sempre segue o schema definido no código.
+
+Horário e reserva continuam fora do alcance da IA. O backend confere cada id contra o catálogo, recusa datas no passado ou muito distantes e calcula os horários livres com as mesmas regras da tela manual. Com a sugestão na tela, o cliente confirma um horário, que passa pelo mesmo `POST /agendamentos` e pela mesma constraint do banco, ou toca em Ajustar para corrigir no formulário.
+
+A decisão final é do cliente porque alguns erros do modelo parecem acertos para o código. Ele pode escolher o João errado quando dois profissionais têm o mesmo nome, entender "sexta" como a da semana seguinte ou trocar corte degradê por social. Todas essas sugestões passam na validação, e só quem escreveu o pedido percebe que estão erradas.
+
+| O que pode dar errado | Como o sistema reage |
+|---|---|
+| O modelo cita um id que não existe ou mistura barbearias | 422, e a tela mostra a escolha manual |
+| A data vem inválida, no passado ou a mais de 60 dias | 422 |
+| O modelo recusa o pedido ou a resposta vem cortada | 422 |
+| A API do Claude recusa o pedido por sobrecarga ou erro interno | Uma nova tentativa; se falhar de novo, 503 e o uso volta para a cota, porque recusas não são cobradas |
+| A API do Claude demora mais de 8 s | 503 sem nova tentativa, e o uso continua contado, porque o pedido pode ter sido processado e cobrado |
+| O dia pedido não tem vaga no período | A sugestão traz a próxima data com vaga e avisa a troca |
+| Alguém tenta gastar a cota da demonstração | Limite de 5 sugestões por usuário e 30 no total por dia, contados no banco, com uma trava que vale também para rajadas de contas novas |
+| O texto tenta dar ordens ao modelo | O texto vai delimitado como dado, e só ids do catálogo passam pela validação |
+
+A chave da API fica só na variável de ambiente `ANTHROPIC_API_KEY`. Sem ela a aplicação funciona normalmente e a sugestão responde 503. Os testes nunca chamam a API real: um servidor HTTP local faz o papel do Claude e devolve respostas válidas, JSON quebrado, recusa, resposta cortada e erro 500.
+
 ## Arquitetura
 
 O AgendaPro é um monólito modular, organizado por funcionalidade.
@@ -58,6 +80,7 @@ com.agendapro
 ├── servico
 ├── disponibilidade
 ├── agendamento
+├── sugestao
 ├── security
 └── shared
 ```
@@ -102,6 +125,7 @@ Os controllers cuidam do contrato HTTP, os services coordenam casos de uso e tra
 - Spring Web, Validation e Data JPA
 - Spring Security e JWT
 - PostgreSQL e Flyway
+- API do Claude, pelo SDK oficial da Anthropic para Java
 - JUnit 5, Mockito e Testcontainers
 - Swagger/OpenAPI
 - Maven Wrapper
@@ -122,6 +146,7 @@ Crie o banco `agendapro` e o usuário `agendapro_user`. Depois configure:
 |---|---|
 | `DB_PASSWORD` | Senha do PostgreSQL local |
 | `JWT_SECRET` | Chave Base64 com pelo menos 32 bytes |
+| `ANTHROPIC_API_KEY` | Opcional. Liga a sugestão por IA; vazia, ela responde 503 |
 
 Para gerar uma chave de desenvolvimento no PowerShell:
 
@@ -172,6 +197,7 @@ Principais grupos de endpoints:
 | Serviços | catálogo por barbearia e associação com profissionais |
 | Disponibilidade | jornada, almoço, bloqueios, horários extras e consulta de vagas |
 | Agendamentos | criação, filtros, confirmação, cancelamento e conclusão |
+| Sugestões | `POST /sugestoes-agendamento`, interpretação de texto livre com IA |
 
 Todos os endpoints usam o prefixo `/api/v1`.
 
@@ -181,7 +207,7 @@ Todos os endpoints usam o prefixo `/api/v1`.
 .\mvnw.cmd verify
 ```
 
-Na última verificação local, os 164 testes passaram. A suíte inclui:
+Na última verificação local, os 213 testes passaram. A suíte inclui:
 
 - testes unitários de services e entidades;
 - Mockito para colaboradores isolados;
@@ -190,7 +216,8 @@ Na última verificação local, os 164 testes passaram. A suíte inclui:
 - PostgreSQL real com Testcontainers;
 - teste de concorrência para reservas simultâneas;
 - persistência e validação de imagens;
-- bootstrap seguro do primeiro administrador.
+- bootstrap seguro do primeiro administrador;
+- respostas simuladas do Claude, válidas e inválidas, sem chamar a API real.
 
 O GitHub Actions executa `mvn verify` com Java 21 em todo push e pull request para `main`.
 
@@ -240,6 +267,7 @@ A demonstração está em [https://agenda-pro-web-agendapro2.vercel.app](https:/
 - As imagens ficam no banco, em `BYTEA`, e não num object storage. O disco do plano gratuito é efêmero e apagava as fotos a cada implantação, e guardá-las no banco resolveu com a infraestrutura que já existia. Com mais volume, o certo seria S3 ou equivalente; a troca fica contida em `ArmazenamentoImagemService`.
 - As fotos são gravadas no tamanho original, sem redimensionamento no upload, então uma capa pode ocupar alguns megabytes.
 - A observabilidade é mínima: há health check, mas não há métricas nem rastreamento distribuído.
+- O catálogo vai no prompt da sugestão por IA, com no máximo 30 serviços e 30 profissionais por barbearia. Se mesmo assim a mensagem passar de 40 mil caracteres, a IA não é chamada e a sugestão fica indisponível, o que protege o custo de cada chamada. Com centenas de unidades seria preciso filtrar o catálogo antes, por cidade, por exemplo.
 - O ambiente de demonstração é compartilhado. Os dados são fictícios e qualquer visitante pode alterá-los.
 
 ## Autor

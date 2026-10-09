@@ -1,5 +1,6 @@
 package com.agendapro.profissionalservico.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,4 +37,14 @@ public interface ProfissionalServicoRepository
 
 	@EntityGraph(attributePaths = {"profissional", "servico"})
 	List<ProfissionalServico> findAllByServicoIdAndAtivoTrue(Long servicoId);
+
+	/**
+	 * Associacoes de varios profissionais de uma vez, so com os servicos que
+	 * entraram no catalogo da sugestao. Sem entity graph: o catalogo le apenas os
+	 * ids, que o Hibernate entrega sem carregar profissional nem servico.
+	 */
+	List<ProfissionalServico> findAllByProfissionalIdInAndServicoIdInAndAtivoTrue(
+			Collection<Long> profissionalIds,
+			Collection<Long> servicoIds
+	);
 }

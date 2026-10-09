@@ -34,6 +34,10 @@ public interface ProfissionalRepository extends JpaRepository<Profissional, Long
 	@EntityGraph(attributePaths = {"usuario", "barbearia"})
 	List<Profissional> findAllByBarbeariaId(Long barbeariaId);
 
+	/** Catalogo da sugestao por IA: o limite vai para o SQL, nao para a memoria. */
+	@EntityGraph(attributePaths = {"usuario"})
+	List<Profissional> findTop30ByBarbeariaIdAndAtivoTrueAndUsuarioAtivoTrueOrderByIdAsc(Long barbeariaId);
+
 	boolean existsByBarbeariaIdAndAtivoTrue(Long barbeariaId);
 
 	boolean existsByBarbeariaIdAndUsuarioIdAndAtivoTrue(Long barbeariaId, Long usuarioId);
