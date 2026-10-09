@@ -207,7 +207,7 @@ Todos os endpoints usam o prefixo `/api/v1`.
 .\mvnw.cmd verify
 ```
 
-Na última verificação local, os 210 testes passaram. A suíte inclui:
+Na última verificação local, os 213 testes passaram. A suíte inclui:
 
 - testes unitários de services e entidades;
 - Mockito para colaboradores isolados;
