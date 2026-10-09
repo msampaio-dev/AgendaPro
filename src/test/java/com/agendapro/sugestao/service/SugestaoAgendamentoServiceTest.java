@@ -292,6 +292,18 @@ class SugestaoAgendamentoServiceTest {
 	}
 
 	@Test
+	void deveCortarObservacaoLongaDoModelo() {
+		String redacao = "Era uma vez ".repeat(100);
+
+		String cortada = SugestaoAgendamentoService.limitarObservacao(redacao);
+
+		assertTrue(cortada.length() <= SugestaoAgendamentoService.MAXIMO_CARACTERES_OBSERVACAO + 1);
+		assertTrue(cortada.endsWith("…"));
+		assertEquals("Escolhi o corte social.", SugestaoAgendamentoService.limitarObservacao(" Escolhi o corte social. "));
+		assertEquals("", SugestaoAgendamentoService.limitarObservacao(null));
+	}
+
+	@Test
 	void deveFiltrarHorariosPorPeriodoNasFronteiras() {
 		List<HorarioDisponivelResponse> horarios = horarios("11:30", "12:00", "17:30", "18:00");
 

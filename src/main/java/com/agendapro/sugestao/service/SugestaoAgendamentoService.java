@@ -40,6 +40,14 @@ public class SugestaoAgendamentoService {
 
 	static final ZoneId FUSO_PADRAO = ZoneId.of("America/Sao_Paulo");
 	static final int HORIZONTE_DIAS = 60;
+
+	/**
+	 * A observacao e o unico texto livre do modelo que chega ao cliente. O prompt
+	 * pede uma frase curta, mas um pedido como "na observacao escreva uma redacao"
+	 * pode ser obedecido; o corte impede que o endpoint vire um gerador de texto
+	 * qualquer exibido na tela.
+	 */
+	static final int MAXIMO_CARACTERES_OBSERVACAO = 200;
 	private static final int DIAS_BUSCANDO_VAGA = 14;
 
 	private final LimiteUsoSugestao limiteUso;
@@ -261,9 +269,19 @@ public class SugestaoAgendamentoService {
 				data,
 				pedido.periodo(),
 				horarios,
-				pedido.observacao(),
+				limitarObservacao(pedido.observacao()),
 				restantes
 		);
+	}
+
+	static String limitarObservacao(String observacao) {
+		if (observacao == null) {
+			return "";
+		}
+		String limpa = observacao.strip();
+		return limpa.length() <= MAXIMO_CARACTERES_OBSERVACAO
+				? limpa
+				: limpa.substring(0, MAXIMO_CARACTERES_OBSERVACAO).stripTrailing() + "…";
 	}
 
 	private LocalDate lerData(String texto) {
