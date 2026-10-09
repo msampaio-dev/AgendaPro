@@ -68,7 +68,15 @@ public class SugestaoAgendamentoService {
 		LimiteUsoSugestao.UsoRegistrado uso = limiteUso.registrarUso(usuarioId);
 
 		LocalDate hoje = LocalDate.now(clock.withZone(FUSO_PADRAO));
-		CatalogoSugestao catalogo = catalogoService.montar(hoje);
+		CatalogoSugestao catalogo;
+		try {
+			catalogo = catalogoService.montar(hoje);
+		} catch (RuntimeException exception) {
+			// Falha no banco antes de chamar a IA: nada foi cobrado, e o uso nao
+			// pode ficar contado (uma instabilidade do Neon esgotaria o teto do dia).
+			limiteUso.devolverUso(usuarioId, uso.dia());
+			throw exception;
+		}
 		PedidoInterpretado pedido;
 		try {
 			pedido = interpretador.interpretar(texto, catalogo);
