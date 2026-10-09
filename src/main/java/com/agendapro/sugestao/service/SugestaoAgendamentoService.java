@@ -1,9 +1,7 @@
 package com.agendapro.sugestao.service;
 
-import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Objects;
@@ -45,7 +43,6 @@ import com.agendapro.sugestao.ia.PedidoInterpretado.Periodo;
 @Service
 public class SugestaoAgendamentoService {
 
-	static final ZoneId FUSO_PADRAO = ZoneId.of("America/Sao_Paulo");
 	static final int HORIZONTE_DIAS = 60;
 
 	/**
@@ -61,20 +58,17 @@ public class SugestaoAgendamentoService {
 	private final CatalogoSugestaoService catalogoService;
 	private final InterpretadorPedido interpretador;
 	private final DisponibilidadeService disponibilidadeService;
-	private final Clock clock;
 
 	public SugestaoAgendamentoService(
 			LimiteUsoSugestao limiteUso,
 			CatalogoSugestaoService catalogoService,
 			InterpretadorPedido interpretador,
-			DisponibilidadeService disponibilidadeService,
-			Clock clock
+			DisponibilidadeService disponibilidadeService
 	) {
 		this.limiteUso = limiteUso;
 		this.catalogoService = catalogoService;
 		this.interpretador = interpretador;
 		this.disponibilidadeService = disponibilidadeService;
-		this.clock = clock;
 	}
 
 	public SugestaoAgendamentoResponse sugerir(Long usuarioId, String texto) {
@@ -82,7 +76,9 @@ public class SugestaoAgendamentoService {
 		// passem todas do limite enquanto esperam a IA.
 		LimiteUsoSugestao.UsoRegistrado uso = limiteUso.registrarUso(usuarioId);
 
-		LocalDate hoje = LocalDate.now(clock.withZone(FUSO_PADRAO));
+		// "Hoje" e o dia em que o uso foi contado: assim a cota e o calendario
+		// enviado a IA nunca discordam sobre a data, nem perto da meia-noite.
+		LocalDate hoje = uso.dia();
 		CatalogoSugestao catalogo;
 		try {
 			catalogo = catalogoService.montar(hoje);
