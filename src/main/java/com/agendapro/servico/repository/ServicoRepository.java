@@ -14,5 +14,8 @@ public interface ServicoRepository extends JpaRepository<Servico, Long> {
 
 	List<Servico> findAllByBarbeariaIdAndAtivoTrueOrderByNomeAsc(Long barbeariaId);
 
+	/** Catalogo da sugestao por IA: o limite vai para o SQL, nao para a memoria. */
+	List<Servico> findTop30ByBarbeariaIdAndAtivoTrueOrderByIdAsc(Long barbeariaId);
+
 	List<Servico> findAllByOrderByNomeAsc();
 }
