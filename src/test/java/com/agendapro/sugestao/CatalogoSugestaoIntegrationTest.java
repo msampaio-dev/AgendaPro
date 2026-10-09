@@ -43,5 +43,22 @@ class CatalogoSugestaoIntegrationTest extends PostgresIntegrationTest {
 		assertEquals(30, unidade.servicos().size());
 		assertTrue(unidade.servicos().stream().anyMatch(servico -> servico.nome().equals("Barba")),
 				"os servicos originais continuam no catalogo");
+
+		// Associacao com um servico que ficou fora do corte nao vai para o prompt.
+		Long ultimoInflado = jdbc.queryForObject(
+				"SELECT MAX(id) FROM servicos WHERE barbearia_id = ?", Long.class, ipanema);
+		Long profissionalId = unidade.profissionais().get(0).id();
+		jdbc.update("INSERT INTO profissionais_servicos (profissional_id, servico_id, ativo) VALUES (?, ?, TRUE)",
+				profissionalId, ultimoInflado);
+		CatalogoSugestao.Profissional profissional = catalogoService.montar(LocalDate.of(2026, 10, 7))
+				.barbearias().stream()
+				.filter(barbearia -> barbearia.id().equals(ipanema))
+				.findFirst().orElseThrow()
+				.profissionais().stream()
+				.filter(item -> item.id().equals(profissionalId))
+				.findFirst().orElseThrow();
+		assertTrue(!profissional.servicoIds().contains(ultimoInflado));
+		assertTrue(unidade.servicos().stream()
+				.allMatch(servico -> !servico.id().equals(ultimoInflado)));
 	}
 }

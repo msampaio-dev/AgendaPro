@@ -1,5 +1,6 @@
 package com.agendapro.profissionalservico.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,4 +37,11 @@ public interface ProfissionalServicoRepository
 
 	@EntityGraph(attributePaths = {"profissional", "servico"})
 	List<ProfissionalServico> findAllByServicoIdAndAtivoTrue(Long servicoId);
+
+	/** So as associacoes com servicos que entraram no catalogo da sugestao. */
+	@EntityGraph(attributePaths = {"servico"})
+	List<ProfissionalServico> findAllByProfissionalIdAndAtivoTrueAndServicoIdIn(
+			Long profissionalId,
+			Collection<Long> servicoIds
+	);
 }

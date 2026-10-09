@@ -1,8 +1,9 @@
 package com.agendapro.sugestao.service;
 
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,7 +13,6 @@ import com.agendapro.barbearia.repository.BarbeariaRepository;
 import com.agendapro.profissional.entity.Profissional;
 import com.agendapro.profissional.repository.ProfissionalRepository;
 import com.agendapro.profissionalservico.repository.ProfissionalServicoRepository;
-import com.agendapro.servico.entity.Servico;
 import com.agendapro.servico.repository.ServicoRepository;
 import com.agendapro.sugestao.ia.CatalogoSugestao;
 
@@ -34,6 +34,10 @@ public class CatalogoSugestaoService {
 	 * conta de demonstracao e publica e e de profissional), e cada servico vira
 	 * texto pago em toda chamada a IA. Ficam os mais antigos, para que servicos
 	 * criados em massa nao tirem do prompt os que ja existiam.
+	 *
+	 * O corte acontece no SQL (findTop30...): cortar em memoria leria do banco
+	 * todos os servicos de uma unidade inflada a cada sugestao. Se este valor
+	 * mudar, o nome das consultas precisa mudar junto.
 	 */
 	static final int MAXIMO_POR_BARBEARIA = 30;
 
@@ -66,34 +70,38 @@ public class CatalogoSugestaoService {
 
 	private CatalogoSugestao.Barbearia barbearia(Barbearia barbearia) {
 		List<CatalogoSugestao.Servico> servicos = servicoRepository
-				.findAllByBarbeariaIdAndAtivoTrueOrderByNomeAsc(barbearia.getId())
+				.findTop30ByBarbeariaIdAndAtivoTrueOrderByIdAsc(barbearia.getId())
 				.stream()
-				.sorted(Comparator.comparing(Servico::getId))
-				.limit(MAXIMO_POR_BARBEARIA)
 				.map(servico -> new CatalogoSugestao.Servico(
 						servico.getId(), servico.getNome(), servico.getDuracaoMinutos()))
 				.toList();
+		Set<Long> servicoIds = servicos.stream()
+				.map(CatalogoSugestao.Servico::id)
+				.collect(Collectors.toSet());
 
 		List<CatalogoSugestao.Profissional> profissionais = profissionalRepository
-				.findAllByBarbeariaId(barbearia.getId())
+				.findTop30ByBarbeariaIdAndAtivoTrueAndUsuarioAtivoTrueOrderByIdAsc(barbearia.getId())
 				.stream()
-				.filter(profissional -> profissional.isAtivo() && profissional.getUsuario().isAtivo())
-				.sorted(Comparator.comparing(Profissional::getId))
-				.limit(MAXIMO_POR_BARBEARIA)
-				.map(this::profissional)
+				.map(profissional -> profissional(profissional, servicoIds))
 				.toList();
 
 		return new CatalogoSugestao.Barbearia(
 				barbearia.getId(), barbearia.getNome(), profissionais, servicos);
 	}
 
-	private CatalogoSugestao.Profissional profissional(Profissional profissional) {
-		List<Long> servicoIds = profissionalServicoRepository
-				.findAllByProfissionalIdAndAtivoTrue(profissional.getId())
-				.stream()
-				.filter(associacao -> associacao.getServico().isAtivo())
-				.map(associacao -> associacao.getServico().getId())
-				.toList();
+	private CatalogoSugestao.Profissional profissional(
+			Profissional profissional,
+			Set<Long> servicosDoCatalogo
+	) {
+		List<Long> servicoIds = servicosDoCatalogo.isEmpty()
+				? List.of()
+				: profissionalServicoRepository
+						.findAllByProfissionalIdAndAtivoTrueAndServicoIdIn(
+								profissional.getId(), servicosDoCatalogo)
+						.stream()
+						.map(associacao -> associacao.getServico().getId())
+						.sorted()
+						.toList();
 		return new CatalogoSugestao.Profissional(
 				profissional.getId(), profissional.getUsuario().getNome(), servicoIds);
 	}
