@@ -254,6 +254,16 @@ class SugestaoAgendamentoServiceTest {
 	}
 
 	@Test
+	void deveDevolverUsoQuandoOCatalogoNaoPodeSerMontado() {
+		when(limiteUso.registrarUso(USUARIO_ID)).thenReturn(new LimiteUsoSugestao.UsoRegistrado(HOJE, 9));
+		when(catalogoService.montar(HOJE)).thenThrow(new IllegalStateException("banco indisponivel"));
+
+		assertThrows(IllegalStateException.class, () -> service.sugerir(USUARIO_ID, TEXTO));
+		verify(limiteUso).devolverUso(USUARIO_ID, HOJE);
+		verify(interpretador, never()).interpretar(any(), any());
+	}
+
+	@Test
 	void naoDeveDevolverUsoQuandoAChamadaPodeTerSidoCobrada() {
 		when(limiteUso.registrarUso(USUARIO_ID)).thenReturn(new LimiteUsoSugestao.UsoRegistrado(HOJE, 9));
 		when(catalogoService.montar(HOJE)).thenReturn(CATALOGO);
