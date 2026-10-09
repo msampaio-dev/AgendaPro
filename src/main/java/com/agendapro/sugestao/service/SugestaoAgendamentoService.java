@@ -11,9 +11,16 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
+import com.agendapro.agendamento.exception.ServicoAdicionalInvalidoException;
+import com.agendapro.barbearia.exception.BarbeariaInativaException;
 import com.agendapro.disponibilidade.dto.DisponibilidadeResponse;
 import com.agendapro.disponibilidade.dto.HorarioDisponivelResponse;
 import com.agendapro.disponibilidade.service.DisponibilidadeService;
+import com.agendapro.profissional.exception.ProfissionalInativoException;
+import com.agendapro.profissional.exception.ProfissionalNaoEncontradoException;
+import com.agendapro.profissionalservico.exception.ProfissionalNaoRealizaServicoException;
+import com.agendapro.servico.exception.ServicoInativoException;
+import com.agendapro.servico.exception.ServicoNaoEncontradoException;
 import com.agendapro.sugestao.dto.SugestaoAgendamentoResponse;
 import com.agendapro.sugestao.exception.PedidoNaoInterpretadoException;
 import com.agendapro.sugestao.exception.SugestaoIndisponivelException;
@@ -188,9 +195,24 @@ public class SugestaoAgendamentoService {
 		Long adicionalId = escolha.adicional() == null ? null : escolha.adicional().id();
 
 		for (CatalogoSugestao.Profissional profissional : escolha.candidatos()) {
-			Optional<DisponibilidadeResponse> encontrada = primeiraComVaga(
-					profissional.id(), escolha.servico().id(), adicionalId,
-					escolha.data(), hoje, pedido.periodo());
+			Optional<DisponibilidadeResponse> encontrada;
+			try {
+				encontrada = primeiraComVaga(
+						profissional.id(), escolha.servico().id(), adicionalId,
+						escolha.data(), hoje, pedido.periodo());
+			} catch (ProfissionalNaoEncontradoException
+					| ProfissionalInativoException
+					| BarbeariaInativaException
+					| ServicoNaoEncontradoException
+					| ServicoInativoException
+					| ProfissionalNaoRealizaServicoException
+					| ServicoAdicionalInvalidoException exception) {
+				// O catalogo foi montado instantes antes; se algo foi desativado no
+				// meio do caminho, a resposta segue o contrato da sugestao (422) e
+				// o frontend volta para a escolha manual.
+				throw new PedidoNaoInterpretadoException(
+						"Os dados da barbearia mudaram enquanto a sugestão era montada. Escolha manualmente.");
+			}
 			if (encontrada.isPresent()) {
 				DisponibilidadeResponse disponibilidade = encontrada.get();
 				return resposta(escolha, profissional, pedido, disponibilidade.data(),
