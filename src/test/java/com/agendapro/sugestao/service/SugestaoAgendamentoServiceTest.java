@@ -31,6 +31,7 @@ import com.agendapro.disponibilidade.dto.DisponibilidadeResponse;
 import com.agendapro.disponibilidade.dto.HorarioDisponivelResponse;
 import com.agendapro.disponibilidade.dto.SituacaoDisponibilidade;
 import com.agendapro.disponibilidade.service.DisponibilidadeService;
+import com.agendapro.profissional.exception.ProfissionalInativoException;
 import com.agendapro.sugestao.dto.SugestaoAgendamentoResponse;
 import com.agendapro.sugestao.exception.LimiteSugestoesAtingidoException;
 import com.agendapro.sugestao.exception.PedidoNaoInterpretadoException;
@@ -289,6 +290,15 @@ class SugestaoAgendamentoServiceTest {
 
 		assertThrows(LimiteSugestoesAtingidoException.class, () -> service.sugerir(USUARIO_ID, TEXTO));
 		verify(interpretador, never()).interpretar(any(), any());
+	}
+
+	@Test
+	void deveResponderComoPedidoNaoInterpretadoQuandoOProfissionalFoiDesativadoNoMeioDoCaminho() {
+		prepararChamada(pedido(IPANEMA, JOAO, CORTE, null, "2026-10-09", Periodo.TARDE));
+		when(disponibilidadeService.consultar(JOAO, CORTE, null, SEXTA))
+				.thenThrow(new ProfissionalInativoException(JOAO));
+
+		assertThrows(PedidoNaoInterpretadoException.class, () -> service.sugerir(USUARIO_ID, TEXTO));
 	}
 
 	@Test
