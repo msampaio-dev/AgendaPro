@@ -74,15 +74,21 @@ public class ClaudeInterpretadorPedido implements InterpretadorPedido {
 			  ids proprios de servico: use os ids da barbearia escolhida.
 			- Profissional: preencha so se o cliente citou um nome que existe no
 			  catalogo. Nomes podem vir incompletos ou sem acento ("Joao" para "João
-			  Gabriel"). Se o nome citado nao existe, deixe null e siga com o resto do
-			  pedido. So diga que ha outro profissional quando dois nomes do catalogo
+			  Gabriel"). Um nome que nao existe no catalogo nunca impede a sugestao:
+			  deixe profissionalId null, preencha servico, barbearia e data normalmente
+			  e diga na observacao que nao ha profissional com esse nome. Exemplo:
+			  "corte com o Ricardo", sem Ricardo no catalogo, vira o corte mais simples
+			  da primeira barbearia, sem profissional. So diga que ha outro profissional quando dois nomes do catalogo
 			  combinam com o que o cliente escreveu.
 			- Dois servicos pedidos: o principal vai em servicoId e o segundo em
 			  servicoAdicionalId, da mesma barbearia. Servicos a mais ou que nao existem
 			  no catalogo ficam de fora e sao citados na observacao.
 			- Data: converta expressoes relativas ("amanha", "sexta") usando o
-			  calendario fornecido. Um dia da semana sem outra indicacao e a proxima
-			  ocorrencia a partir de hoje, incluindo hoje. Sem dia informado, data null.
+			  calendario fornecido, que marca hoje e amanha. Um dia da semana sozinho e
+			  a proxima ocorrencia a partir de hoje, incluindo hoje; "proxima sexta"
+			  tambem. Com "que vem" ou "da semana que vem", e a ocorrencia da semana
+			  seguinte, nunca hoje: se hoje e segunda, "segunda que vem" e a segunda 7
+			  dias depois. Sem dia informado, data null.
 			- Periodo: MANHA antes das 12h, TARDE das 12h as 18h, NOITE depois das 18h,
 			  QUALQUER se o cliente nao disse.
 			- A observacao fala com o cliente, em portugues, em uma frase curta, e so
@@ -265,6 +271,7 @@ public class ClaudeInterpretadorPedido implements InterpretadorPedido {
 					.append(data.getDayOfWeek().getDisplayName(TextStyle.FULL, PT_BR))
 					.append(' ')
 					.append(data)
+					.append(dia == 0 ? " (hoje)" : dia == 1 ? " (amanha)" : "")
 					.append('\n');
 		}
 
