@@ -66,6 +66,16 @@ A decisão final é do cliente porque alguns erros do modelo parecem acertos par
 
 A chave da API fica só na variável de ambiente `ANTHROPIC_API_KEY`. Sem ela a aplicação funciona normalmente e a sugestão responde 503. Os testes nunca chamam a API real: um servidor HTTP local faz o papel do Claude e devolve respostas válidas, JSON quebrado, recusa, resposta cortada e erro 500.
 
+### O que deu errado no teste com o modelo real
+
+Os testes automáticos simulam a API, então só provam que o código trata bem as respostas que alguém imaginou. Antes do merge, rodei 12 pedidos reais contra o Claude Haiku 5.5. A integração funcionou de primeira, com respostas entre 1,4 e 4,7 segundos, mas só 8 dos 12 pedidos deram o resultado certo.
+
+O erro principal era de desenho. Cada barbearia tem ids próprios para os mesmos serviços, e o prompt mandava deixar a barbearia vazia quando o cliente não citava nenhuma. Sem barbearia, o modelo não tinha de onde tirar o id do serviço e o deixava vazio, e pedidos claros como "corte degradê amanhã de manhã" eram recusados. A observação também inventava um profissional "de nome parecido" e dizia "agendado com o Henrique" quando nada tinha sido agendado. Mudei o prompt para escolher a primeira barbearia que oferece o serviço, e os acertos subiram para 10 de 12.
+
+Sobraram dois erros. Um profissional que não existe ("corte com o Ricardo") fazia o modelo desistir do pedido inteiro. E "segunda que vem", pedido numa segunda, virava a data de hoje, uma sugestão válida e com cara de certa que nenhuma validação no backend consegue pegar. Depois de mais um ajuste, os 12 pedidos passaram. Escrevi também 4 pedidos novos só para essa rodada, para não ajustar o prompt aos casos já conhecidos, e eles passaram. Um deles mostrou que a minha regra para "próxima sexta" estava errada: no uso comum é a sexta logo a seguir, e o modelo fez isso mesmo contra a regra.
+
+As três rodadas custaram cerca de 4 centavos de dólar. O caso da "segunda que vem" explica por que a decisão final fica com o cliente: a tela mostra a data entendida antes de qualquer reserva, e só quem fez o pedido sabe se ela está certa.
+
 ## Arquitetura
 
 O AgendaPro é um monólito modular, organizado por funcionalidade.
