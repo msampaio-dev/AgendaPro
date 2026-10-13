@@ -47,9 +47,13 @@ Um teste de concorrência com PostgreSQL real dispara duas requisições pratica
 
 ## Sugestão de agendamento com IA
 
-Em vez de clicar etapa por etapa, o cliente pode escrever o que quer, como "corte e barba sexta à tarde com o João". A API manda esse texto ao Claude com a lista de barbearias, profissionais e serviços ativos e um calendário dos próximos 14 dias. O modelo responde com um JSON que traz ids dessa lista, uma data e o período do dia. A chamada usa saída estruturada, então o JSON sempre segue o schema definido no código.
+![Demonstração da sugestão por IA: o cliente escreve "Barba e corte com Wesley sexta-feira de tarde", recebe barbearia, profissional, serviço e data preenchidos, escolhe 16:00 e o agendamento aparece em Meus agendamentos](docs/screenshots/sugestao-ia.gif)
 
-Horário e reserva continuam fora do alcance da IA. O backend confere cada id contra o catálogo, recusa datas no passado ou muito distantes e calcula os horários livres com as mesmas regras da tela manual. Com a sugestão na tela, o cliente confirma um horário, que passa pelo mesmo `POST /agendamentos` e pela mesma constraint do banco, ou toca em Ajustar para corrigir no formulário.
+O cliente pode pedir o agendamento escrevendo, sem passar etapa por etapa. No GIF, ele escreve "Barba e corte com Wesley sexta-feira de tarde" e a tela preenche barbearia, profissional, serviço e data, com os horários livres daquela tarde. Ele escolhe 16:00 e confirma.
+
+A API manda o texto ao Claude Haiku 5.5 junto com o catálogo das barbearias e um calendário dos próximos 14 dias. O modelo devolve um JSON com ids do catálogo, uma data e o período do dia. A chamada usa saída estruturada, então o JSON sempre segue o schema definido no código. O backend confere cada id, recusa datas no passado ou distantes demais e calcula os horários livres com as mesmas regras da tela manual.
+
+A IA nunca reserva nada. A reserva só acontece quando o cliente confirma, pelo mesmo `POST /agendamentos` e pela mesma constraint do banco. Se a sugestão vier errada, o botão Ajustar leva ao formulário.
 
 A decisão final é do cliente porque alguns erros do modelo parecem acertos para o código. Ele pode escolher o João errado quando dois profissionais têm o mesmo nome, entender "sexta" como a da semana seguinte ou trocar corte degradê por social. Todas essas sugestões passam na validação, e só quem escreveu o pedido percebe que estão erradas.
 
