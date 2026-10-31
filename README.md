@@ -1,5 +1,7 @@
 # AgendaPro API
 
+**Português** | [English](README.en.md)
+
 [![Backend CI](https://github.com/msampaio-dev/AgendaPro/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/msampaio-dev/AgendaPro/actions/workflows/backend-ci.yml)
 [![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
 [![Spring Boot 3.5](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
